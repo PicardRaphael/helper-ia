@@ -44,6 +44,14 @@ const AI_PLATFORMS = [
     webFallback: 'https://gemini.google.com/',
   },
   {
+    id: 'grok',
+    name: 'Grok - Assistant IA',
+    // APP xAI séparée → STORE DIRECT !
+    iosStore: 'https://apps.apple.com/app/grok/id6499194723',
+    androidStore: 'https://play.google.com/store/apps/details?id=ai.x.grok',
+    webFallback: 'https://x.ai/',
+  },
+  {
     id: 'twitter',
     name: 'X (Twitter)',
     // SCHEMES NATIFS ÉPROUVÉS → APP DIRECTE !
@@ -52,7 +60,7 @@ const AI_PLATFORMS = [
     iosStore: 'https://apps.apple.com/app/x/id333903271',
     androidStore:
       'https://play.google.com/store/apps/details?id=com.twitter.android',
-    webFallback: 'https://x.ai/',
+    webFallback: 'https://twitter.com/',
   },
 ];
 
@@ -145,53 +153,79 @@ export default function GeneratedScreen() {
     const isAndroid = Platform.OS === 'android';
     const isWeb = Platform.OS === 'web';
 
-    try {
-      console.log(`🚀 Ouverture ${platform.name} sur ${Platform.OS}`);
+    console.log(`🚀 PRIORITÉ APP NATIVE - ${platform.name} sur ${Platform.OS}`);
 
-      // Sur WEB : toujours ouvrir dans un nouvel onglet
+    try {
+      // ═══ WEB : Ouverture simple ═══
       if (isWeb) {
-        console.log(`🌐 Web: Ouverture dans nouvel onglet: ${platform.url}`);
-        window.open(platform.url, '_blank');
+        const webUrl = platform.webFallback;
+        console.log(`🌐 Web: ${webUrl}`);
+        window.open(webUrl, '_blank');
         console.log(`✅ ${platform.name} ouvert dans nouvel onglet !`);
         return;
       }
 
-      // Sur MOBILE (iOS/Android) : essayer schemes natifs d'abord
-      if (
-        (isIOS || isAndroid) &&
-        platform.iosScheme &&
-        platform.androidScheme
-      ) {
+      // ═══ MOBILE : STRATÉGIE AGRESSIVE POUR APP NATIVE ═══
+
+      // ÉTAPE 1 : Essayer scheme natif direct (Twitter/X)
+      if (platform.iosScheme || platform.androidScheme) {
         const nativeScheme = isIOS
           ? platform.iosScheme
           : platform.androidScheme;
 
-        try {
-          console.log(`📱 Mobile: Tentative scheme natif: ${nativeScheme}`);
-          await Linking.openURL(nativeScheme);
-          console.log(`✅ ${platform.name} ouvert via scheme natif !`);
-          return;
-        } catch (schemeError) {
-          console.log(
-            `⚠️ Scheme natif échoué, fallback vers navigateur mobile`
-          );
-          // Continue vers l'URL web
+        if (nativeScheme) {
+          try {
+            console.log(`📱 TENTATIVE 1: Scheme natif → ${nativeScheme}`);
+            await Linking.openURL(nativeScheme);
+            console.log(`🎯 SUCCÈS ! ${platform.name} ouvert via APP NATIVE !`);
+            return;
+          } catch (schemeError) {
+            console.log(`❌ Scheme natif échoué, passage à l'étape 2...`);
+          }
         }
       }
 
-      // Fallback : ouverture dans le navigateur (mobile)
-      console.log(`🌐 Mobile: Ouverture dans navigateur: ${platform.url}`);
-      await Linking.openURL(platform.url);
+      // ÉTAPE 2 : Redirection STORE pour installer l'app (ChatGPT/Gemini)
+      const storeUrl = isIOS ? platform.iosStore : platform.androidStore;
+      if (storeUrl) {
+        console.log(`🏪 TENTATIVE 2: Redirection STORE → ${storeUrl}`);
 
-      if (platform.id === 'chatgpt' || platform.id === 'gemini') {
-        console.log(
-          `⚠️ ${platform.name} s'ouvre dans le navigateur (pas d'App Link configuré)`
+        Alert.alert(
+          `${platform.name} App`,
+          `Voulez-vous installer l'app ${platform.name} pour une meilleure expérience ?`,
+          [
+            {
+              text: 'Installer App',
+              onPress: async () => {
+                try {
+                  await Linking.openURL(storeUrl);
+                  console.log(
+                    `🎯 STORE ouvert pour installer ${platform.name} !`
+                  );
+                } catch (storeError) {
+                  console.log(`❌ Store échoué, fallback web...`);
+                  await Linking.openURL(platform.webFallback);
+                }
+              },
+            },
+            {
+              text: 'Utiliser Web',
+              onPress: async () => {
+                await Linking.openURL(platform.webFallback);
+                console.log(`🌐 ${platform.name} ouvert dans navigateur`);
+              },
+            },
+          ]
         );
-      } else {
-        console.log(`✅ ${platform.name} ouvert avec succès`);
+        return;
       }
+
+      // ÉTAPE 3 : Fallback web (si pas de store configuré)
+      console.log(`🌐 FALLBACK: Ouverture web → ${platform.webFallback}`);
+      await Linking.openURL(platform.webFallback);
+      console.log(`✅ ${platform.name} ouvert dans navigateur`);
     } catch (error) {
-      console.error('❌ Erreur ouverture finale:', error);
+      console.error('💥 ERREUR CRITIQUE:', error);
       Alert.alert('Erreur', `Impossible d'ouvrir ${platform.name}`);
     }
   };
@@ -346,7 +380,7 @@ export default function GeneratedScreen() {
         {/* Sélection plateforme IA */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Aller vers :
+            📱 Ouvrir dans :
           </ThemedText>
           <ThemedView style={styles.platformContainer}>
             {AI_PLATFORMS.map((platform) => (
@@ -394,7 +428,7 @@ export default function GeneratedScreen() {
           onPress={handleGoToPlatform}
         >
           <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
-            Aller vers {selectedPlatform.name}
+            📱 Ouvrir {selectedPlatform.name}
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>

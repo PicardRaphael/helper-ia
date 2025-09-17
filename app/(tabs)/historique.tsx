@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   FlatList,
   RefreshControl,
   SafeAreaView,
@@ -13,16 +14,18 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getAllPrompts, SavedPrompt } from '@/services/promptService';
+import { deletePrompt, getAllPrompts, SavedPrompt } from '@/services/promptService';
 
 // Composant pour une carte de prompt dans la liste
 function PromptCard({
   prompt,
   onPress,
+  onDelete,
   colors,
 }: {
   prompt: SavedPrompt;
   onPress: () => void;
+  onDelete: () => void;
   colors: any;
 }) {
   // Tronquer la demande principale pour l'aperçu
@@ -44,9 +47,18 @@ function PromptCard({
         <ThemedText style={[styles.promptName, { color: colors.text }]}>
           {prompt.name}
         </ThemedText>
-        <ThemedText style={[styles.promptDate, { color: colors.icon }]}>
-          {new Date(prompt.createdAt).toLocaleDateString('fr-FR')}
-        </ThemedText>
+        <View style={styles.dateAndActions}>
+          <ThemedText style={[styles.promptDate, { color: colors.icon }]}>
+            {new Date(prompt.createdAt).toLocaleDateString('fr-FR')}
+          </ThemedText>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={onDelete}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <IconSymbol name='trash' size={16} color='#ff4444' />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ThemedText style={[styles.promptPreview, { color: colors.icon }]}>
