@@ -1,0 +1,286 @@
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getAllPrompts, SavedPrompt } from '@/services/promptService';
+
+// Composant pour une carte de prompt dans la liste
+function PromptCard({
+  prompt,
+  onPress,
+  colors,
+}: {
+  prompt: SavedPrompt;
+  onPress: () => void;
+  colors: any;
+}) {
+  // Tronquer la demande principale pour l'aperçu
+  const truncatedRequest =
+    prompt.mainRequest.length > 80
+      ? prompt.mainRequest.substring(0, 80) + '...'
+      : prompt.mainRequest;
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.promptCard,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardHeader}>
+        <ThemedText style={[styles.promptName, { color: colors.text }]}>
+          {prompt.name}
+        </ThemedText>
+        <ThemedText style={[styles.promptDate, { color: colors.icon }]}>
+          {new Date(prompt.createdAt).toLocaleDateString('fr-FR')}
+        </ThemedText>
+      </View>
+
+      <ThemedText style={[styles.promptPreview, { color: colors.icon }]}>
+        {truncatedRequest}
+      </ThemedText>
+
+      <View style={styles.cardFooter}>
+        <ThemedText style={[styles.promptTone, { color: colors.tint }]}>
+          {prompt.tone}
+        </ThemedText>
+        <IconSymbol name='chevron.right' size={16} color={colors.icon} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+export default function HistoriqueScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'dark'];
+  const router = useRouter();
+
+  const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Charger les prompts
+  const loadPrompts = useCallback(async () => {
+    try {
+      const savedPrompts = await getAllPrompts();
+      // Trier par date de création (plus récent en premier)
+      const sortedPrompts = savedPrompts.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setPrompts(sortedPrompts);
+    } catch (error) {
+      console.error('Erreur lors du chargement des prompts:', error);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Charger au démarrage
+  useEffect(() => {
+    loadPrompts();
+  }, [loadPrompts]);
+
+  // Pull to refresh
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadPrompts();
+  }, [loadPrompts]);
+
+  // Navigation vers l'écran généré
+  const handlePromptPress = (prompt: SavedPrompt) => {
+    router.push({
+      pathname: '/generated',
+      params: {
+        promptId: prompt.id,
+        generatedPrompt: prompt.generatedPrompt,
+        promptName: prompt.name,
+        fromHistory: 'true', // Indiquer qu'on vient de l'historique
+      },
+    });
+  };
+
+  // Rendu de l'état vide
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <IconSymbol
+        name='doc.text'
+        size={64}
+        color={colors.icon}
+        style={styles.emptyIcon}
+      />
+      <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
+        Aucun prompt sauvegardé
+      </ThemedText>
+      <ThemedText style={[styles.emptyDescription, { color: colors.icon }]}>
+        Créez votre premier prompt pour le voir apparaître ici
+      </ThemedText>
+      <TouchableOpacity
+        style={[styles.createButton, { backgroundColor: colors.tint }]}
+        onPress={() => router.push('/(tabs)/prompt')}
+      >
+        <ThemedText style={[styles.createButtonText, { color: '#fff' }]}>
+          Créer un prompt
+        </ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <View style={styles.header}>
+        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+          Historique
+        </ThemedText>
+        <ThemedText style={[styles.headerSubtitle, { color: colors.icon }]}>
+          {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} sauvegardé
+          {prompts.length !== 1 ? 's' : ''}
+        </ThemedText>
+      </View>
+
+      <FlatList
+        data={prompts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <PromptCard
+            prompt={item}
+            onPress={() => handlePromptPress(item)}
+            colors={colors}
+          />
+        )}
+        ListEmptyComponent={!isLoading ? renderEmptyState : null}
+        contentContainerStyle={
+          prompts.length === 0
+            ? styles.emptyListContainer
+            : styles.listContainer
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.tint}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  emptyListContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  promptCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 6,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  promptName: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 8,
+  },
+  promptDate: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  promptPreview: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  promptTone: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+    opacity: 0.6,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  createButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
