@@ -1,10 +1,12 @@
 import * as Clipboard from 'expo-clipboard';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
   Linking,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -28,14 +30,15 @@ import {
 interface AIPlatform {
   id: string;
   name: string;
-  icon?: string; // Emoji fallback
+  icon: string; // Emoji fallback
   logo?: any; // Logo SVG/PNG
   color: string;
   iosStore: string;
   androidStore: string;
   webFallback: string;
   iosScheme?: string;
-  androidScheme?: string;
+  androidPackage?: string;
+  androidActivity?: string; // Nom complet de l'activity LAUNCHER
 }
 
 // Plateformes IA disponibles
@@ -51,6 +54,9 @@ const AI_PLATFORMS: AIPlatform[] = [
     androidStore:
       'https://play.google.com/store/apps/details?id=com.openai.chatgpt',
     webFallback: 'https://chatgpt.com/',
+    iosScheme: 'chatgpt://',
+    androidPackage: 'com.openai.chatgpt',
+    androidActivity: 'com.openai.chatgpt.MainActivity',
   },
   {
     id: 'gemini',
@@ -63,6 +69,11 @@ const AI_PLATFORMS: AIPlatform[] = [
     androidStore:
       'https://play.google.com/store/apps/details?id=com.google.android.apps.bard',
     webFallback: 'https://gemini.google.com/',
+    // Note: certaines installs iOS exposent googleapp:// (Google app)
+    iosScheme: 'googleapp://',
+    androidPackage: 'com.google.android.apps.bard',
+    androidActivity:
+      'com.google.android.apps.bard.shellapp.BardEntryPointActivity',
   },
   {
     id: 'grok',
@@ -74,6 +85,9 @@ const AI_PLATFORMS: AIPlatform[] = [
     iosStore: 'https://apps.apple.com/app/grok/id6499194723',
     androidStore: 'https://play.google.com/store/apps/details?id=ai.x.grok',
     webFallback: 'https://x.ai/',
+    // Scheme iOS non public documenté; on tente store si échec
+    androidPackage: 'ai.x.grok',
+    androidActivity: 'ai.x.grok.main.GrokActivity',
   },
 ];
 
@@ -92,6 +106,7 @@ export default function GeneratedScreen() {
   const [selectedPlatform, setSelectedPlatform] = useState(AI_PLATFORMS[0]);
   const [hasChanges, setHasChanges] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
 
   // Charger le prompt
   useEffect(() => {
@@ -160,55 +175,81 @@ export default function GeneratedScreen() {
     }
   };
 
-  const handleGoToPlatform = async () => {
+  const handleGoToPlatform = () => {
+    setShowPlatformModal(true);
+  };
+
+  const handleGoToApp = async () => {
     const platform = selectedPlatform;
     const isIOS = Platform.OS === 'ios';
     const isAndroid = Platform.OS === 'android';
-    const isWeb = Platform.OS === 'web';
 
-    console.log(`🚀 PRIORITÉ APP NATIVE - ${platform.name} sur ${Platform.OS}`);
+    console.log(
+      `📱 TENTATIVE APP NATIVE - ${platform.name} sur ${Platform.OS}`
+    );
+    setShowPlatformModal(false); // Fermer la modal
 
     try {
-      // ═══ WEB : Ouverture simple ═══
-      if (isWeb) {
-        const webUrl = platform.webFallback;
-        console.log(`🌐 Web: ${webUrl}`);
-        window.open(webUrl, '_blank');
-        console.log(`✅ ${platform.name} ouvert dans nouvel onglet !`);
-        return;
+      // iOS: tenter d'abord le scheme spécifique si présent
+      if (isIOS && platform.iosScheme) {
+        try {
+          console.log(`📱 iOS scheme → ${platform.iosScheme}`);
+          const canOpen = await Linking.canOpenURL(platform.iosScheme);
+          if (canOpen) {
+            await Linking.openURL(platform.iosScheme);
+            return;
+          }
+        } catch {}
       }
 
-      // ═══ MOBILE : STRATÉGIE AGRESSIVE POUR APP NATIVE ═══
-
-      // ÉTAPE 1 : Essayer scheme natif direct (Twitter/X)
-      if (platform.iosScheme || platform.androidScheme) {
-        const nativeScheme = isIOS
-          ? platform.iosScheme
-          : platform.androidScheme;
-
-        if (nativeScheme) {
+      // Android: ouverture explicite du composant LAUNCHER si connu
+      if (isAndroid && platform.androidPackage) {
+        if (platform.androidActivity) {
           try {
-            console.log(`📱 TENTATIVE 1: Scheme natif → ${nativeScheme}`);
-            await Linking.openURL(nativeScheme);
-            console.log(`🎯 SUCCÈS ! ${platform.name} ouvert via APP NATIVE !`);
+            console.log(
+              `🤖 Android COMPONENT → ${platform.androidPackage}/${platform.androidActivity}`
+            );
+            await IntentLauncher.startActivityAsync(
+              'android.intent.action.MAIN',
+              {
+                category: 'android.intent.category.LAUNCHER',
+                packageName: platform.androidPackage,
+                className: platform.androidActivity,
+                flags: 268435456, // FLAG_ACTIVITY_NEW_TASK
+              } as any
+            );
             return;
-          } catch (schemeError) {
-            console.log(`❌ Scheme natif échoué, passage à l'étape 2...`);
+          } catch (componentErr) {
+            console.log('❌ COMPONENT échoué, tentative MAIN package');
           }
+        }
+        // Fallback: tenter MAIN sur le package
+        try {
+          console.log(`🤖 Android MAIN → ${platform.androidPackage}`);
+          await IntentLauncher.startActivityAsync(
+            'android.intent.action.MAIN',
+            {
+              category: 'android.intent.category.LAUNCHER',
+              packageName: platform.androidPackage,
+              flags: 268435456, // FLAG_ACTIVITY_NEW_TASK
+            } as any
+          );
+          return;
+        } catch (intentErr) {
+          console.log('❌ MAIN échoué, on proposera le store');
         }
       }
 
-      // ÉTAPE 2 : Redirection STORE pour installer l'app (ChatGPT/Gemini)
+      // ÉTAPE 3 : Si app pas installée, proposer le store
       const storeUrl = isIOS ? platform.iosStore : platform.androidStore;
       if (storeUrl) {
-        console.log(`🏪 TENTATIVE 2: Redirection STORE → ${storeUrl}`);
-
         Alert.alert(
-          `${platform.name} App`,
-          `Voulez-vous installer l'app ${platform.name} pour une meilleure expérience ?`,
+          `${platform.name} pas installé`,
+          `L'app ${platform.name} n'est pas installée. Voulez-vous l'installer ?`,
           [
+            { text: 'Annuler', style: 'cancel' },
             {
-              text: 'Installer App',
+              text: 'Installer',
               onPress: async () => {
                 try {
                   await Linking.openURL(storeUrl);
@@ -216,30 +257,38 @@ export default function GeneratedScreen() {
                     `🎯 STORE ouvert pour installer ${platform.name} !`
                   );
                 } catch (storeError) {
-                  console.log(`❌ Store échoué, fallback web...`);
-                  await Linking.openURL(platform.webFallback);
+                  Alert.alert('Erreur', `Impossible d'ouvrir le store`);
                 }
-              },
-            },
-            {
-              text: 'Utiliser Web',
-              onPress: async () => {
-                await Linking.openURL(platform.webFallback);
-                console.log(`🌐 ${platform.name} ouvert dans navigateur`);
               },
             },
           ]
         );
-        return;
+      } else {
+        Alert.alert(
+          'App non disponible',
+          `L'app ${platform.name} n'est pas disponible sur cette plateforme.`
+        );
       }
+    } catch (error) {
+      console.error('💥 ERREUR APP:', error);
+      Alert.alert('Erreur', `Impossible d'ouvrir l'app ${platform.name}`);
+    }
+  };
 
-      // ÉTAPE 3 : Fallback web (si pas de store configuré)
-      console.log(`🌐 FALLBACK: Ouverture web → ${platform.webFallback}`);
+  const handleGoToWeb = async () => {
+    const platform = selectedPlatform;
+    console.log(`🌐 OUVERTURE WEB - ${platform.name}`);
+    setShowPlatformModal(false); // Fermer la modal
+
+    try {
       await Linking.openURL(platform.webFallback);
       console.log(`✅ ${platform.name} ouvert dans navigateur`);
     } catch (error) {
-      console.error('💥 ERREUR CRITIQUE:', error);
-      Alert.alert('Erreur', `Impossible d'ouvrir ${platform.name}`);
+      console.error('💥 ERREUR WEB:', error);
+      Alert.alert(
+        'Erreur',
+        `Impossible d'ouvrir ${platform.name} dans le navigateur`
+      );
     }
   };
 
@@ -414,17 +463,12 @@ export default function GeneratedScreen() {
                 ]}
                 onPress={() => setSelectedPlatform(platform)}
               >
-                {platform.logo ? (
-                  <Image
-                    source={platform.logo}
-                    style={styles.platformLogo}
-                    resizeMode='contain'
-                  />
-                ) : (
-                  <ThemedText style={styles.platformIcon}>
-                    {platform.icon}
-                  </ThemedText>
-                )}
+                <Image
+                  source={platform.logo}
+                  style={styles.platformLogo}
+                  resizeMode='contain'
+                />
+
                 <ThemedText
                   style={[
                     styles.platformText,
@@ -443,7 +487,7 @@ export default function GeneratedScreen() {
           </ThemedView>
         </ThemedView>
 
-        {/* Bouton Aller vers */}
+        {/* Bouton d'ouverture */}
         <TouchableOpacity
           style={[
             styles.goButton,
@@ -468,6 +512,93 @@ export default function GeneratedScreen() {
             </ThemedText>
           )}
         </TouchableOpacity>
+
+        {/* Modal de choix */}
+        <Modal
+          visible={showPlatformModal}
+          transparent={true}
+          animationType='slide'
+          onRequestClose={() => setShowPlatformModal(false)}
+        >
+          <ThemedView style={styles.modalOverlay}>
+            <ThemedView
+              style={[styles.modalContent, { backgroundColor: colors.card }]}
+            >
+              {/* Header */}
+              <ThemedView style={styles.modalHeader}>
+                <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
+                  Ouvrir {selectedPlatform.name}
+                </ThemedText>
+              </ThemedView>
+
+              {/* Options */}
+              <ThemedView style={styles.modalOptions}>
+                {/* Bouton App */}
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    { backgroundColor: selectedPlatform.color || '#6366f1' },
+                  ]}
+                  onPress={handleGoToApp}
+                >
+                  {selectedPlatform.logo && (
+                    <Image
+                      source={selectedPlatform.logo}
+                      style={styles.modalButtonLogo}
+                      resizeMode='contain'
+                    />
+                  )}
+                  <ThemedText
+                    style={[styles.modalButtonText, { color: '#fff' }]}
+                  >
+                    📱 Application
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.modalButtonSubtext, { color: '#fff' }]}
+                  >
+                    Ouvrir l'app native
+                  </ThemedText>
+                </TouchableOpacity>
+
+                {/* Bouton Web */}
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.modalButtonSecondary,
+                    { borderColor: selectedPlatform.color || '#6366f1' },
+                  ]}
+                  onPress={handleGoToWeb}
+                >
+                  <ThemedText
+                    style={[
+                      styles.modalButtonText,
+                      { color: selectedPlatform.color || '#6366f1' },
+                    ]}
+                  >
+                    🌐 Navigateur
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.modalButtonSubtext, { color: colors.text }]}
+                  >
+                    Ouvrir dans le navigateur
+                  </ThemedText>
+                </TouchableOpacity>
+              </ThemedView>
+
+              {/* Bouton Annuler */}
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowPlatformModal(false)}
+              >
+                <ThemedText
+                  style={[styles.modalCancelText, { color: colors.text }]}
+                >
+                  Annuler
+                </ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          </ThemedView>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -602,5 +733,72 @@ const styles = StyleSheet.create({
   goButtonText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    maxHeight: '50%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  modalOptions: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  modalButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 72,
+  },
+  modalButtonSecondary: {
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  modalButtonLogo: {
+    width: 24,
+    height: 24,
+    marginBottom: 6,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  modalButtonSubtext: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  modalCancelButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
