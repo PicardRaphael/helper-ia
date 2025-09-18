@@ -26,6 +26,7 @@ const MAPPING = {
   clock: 'history',
   'gearshape.fill': 'settings',
   'mic.fill': 'mic',
+  trash: 'delete',
 } as const;
 
 /**

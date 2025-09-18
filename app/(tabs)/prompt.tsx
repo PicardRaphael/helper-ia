@@ -6,6 +6,7 @@ import {
   FlatList,
   Modal,
   PanResponder,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createPrompt, PromptFormData } from '@/services/promptService';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 // Liste des tons selon project.md
 const TONES = [
   'Neutre / factuel',
@@ -38,6 +43,12 @@ const TONES = [
   'Éducatif / informatif',
   'Storytelling / narratif',
 ];
+
+// Variables globales pour tracker quel input est actif
+let currentActiveField: string | null = null;
+let currentActiveCallback: ((text: string) => void) | null = null;
+let globalIsListening: boolean = false;
+let globalUpdateUI: (() => void) | null = null;
 
 // Composant InputWithMicrophone (DÉPLACÉ EN DEHORS pour éviter les re-renders)
 const InputWithMicrophone = React.memo(
@@ -60,31 +71,108 @@ const InputWithMicrophone = React.memo(
   }) => {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'dark'];
-    const [isListening, setIsListening] = useState<string | null>(null);
+    const [uiUpdate, setUiUpdate] = useState(0); // Pour forcer les re-renders
 
-    // Fonction pour démarrer la reconnaissance vocale
+    // Fonction pour mettre à jour l'UI
+    const forceUIUpdate = () => setUiUpdate((prev) => prev + 1);
+    globalUpdateUI = forceUIUpdate;
+
+    // Gestion des événements de reconnaissance vocale (UNE SEULE FOIS GLOBALEMENT)
+    useSpeechRecognitionEvent('start', () => {
+      console.log('🎤 Reconnaissance démarrée pour:', currentActiveField);
+      globalIsListening = true;
+      globalUpdateUI?.(); // ✨ MISE À JOUR UI
+    });
+
+    useSpeechRecognitionEvent('end', () => {
+      console.log('🎤 Reconnaissance terminée');
+      globalIsListening = false;
+      currentActiveField = null;
+      currentActiveCallback = null;
+      globalUpdateUI?.(); // ✨ MISE À JOUR UI
+    });
+
+    useSpeechRecognitionEvent('result', (event) => {
+      console.log('📝 Résultat pour:', currentActiveField, event.results);
+
+      // SEULEMENT mettre à jour l'input actif
+      if (
+        currentActiveField === fieldName &&
+        currentActiveCallback &&
+        event.results &&
+        event.results.length > 0
+      ) {
+        const spokenText = event.results[0]?.transcript || '';
+
+        if (spokenText.trim()) {
+          // 🔄 REMPLACER au lieu d'ajouter
+          currentActiveCallback(spokenText);
+
+          Alert.alert(
+            '✅ Reconnaissance réussie',
+            `Texte reconnu: "${spokenText}"`
+          );
+        }
+      }
+    });
+
+    useSpeechRecognitionEvent('error', (event) => {
+      console.error('❌ Erreur reconnaissance:', event.error, event.message);
+      globalIsListening = false;
+      currentActiveField = null;
+      currentActiveCallback = null;
+      globalUpdateUI?.(); // ✨ MISE À JOUR UI
+
+      // 🔇 Filtrer les erreurs normales (ne pas afficher de modal)
+      const normalErrors = ['no-speech', 'no-match', 'aborted'];
+      if (!normalErrors.includes(event.error)) {
+        Alert.alert(
+          'Erreur',
+          `Erreur de reconnaissance vocale: ${event.message}`
+        );
+      }
+    });
+
+    // Fonction de reconnaissance vocale avec expo-speech-recognition
     const startVoiceRecognition = async (fieldName: string) => {
       try {
-        if (isListening) {
-          console.log('Reconnaissance déjà en cours');
+        if (globalIsListening) {
+          // Arrêter si déjà en cours
+          ExpoSpeechRecognitionModule.stop();
           return;
         }
 
-        console.log('Démarrage reconnaissance pour:', fieldName);
-        setIsListening(fieldName);
+        // Demander les permissions d'abord
+        const result =
+          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!result.granted) {
+          Alert.alert(
+            'Permission requise',
+            "L'accès au microphone est nécessaire pour la reconnaissance vocale."
+          );
+          return;
+        }
 
-        // Simuler 2 secondes d'écoute puis ajouter texte
-        setTimeout(() => {
-          const currentValue = value || '';
-          const newText = currentValue ? currentValue + ' Test' : 'Test';
-          onChangeText(newText);
-          setIsListening(null);
-          Alert.alert('✅ Test', 'Simulation réussie - écrit "Test"');
-        }, 2000);
+        console.log('🎤 Démarrage reconnaissance pour:', fieldName);
+
+        // DÉFINIR quel input est actif
+        currentActiveField = fieldName;
+        currentActiveCallback = onChangeText;
+
+        // Démarrer la reconnaissance vocale
+        ExpoSpeechRecognitionModule.start({
+          lang: 'fr-FR', // Français
+          interimResults: false, // 🔧 Désactivé pour éviter le flickering
+          continuous: false, // Une seule phrase
+          requiresOnDeviceRecognition: Platform.OS === 'ios', // Recommandé pour iOS
+        });
       } catch (error) {
-        console.error('Erreur démarrage reconnaissance:', error);
-        Alert.alert('Erreur', 'Reconnaissance vocale non disponible');
-        setIsListening(null);
+        console.error('❌ Erreur reconnaissance:', error);
+        Alert.alert('Erreur', 'Erreur lors de la reconnaissance vocale.');
+        globalIsListening = false;
+        currentActiveField = null;
+        currentActiveCallback = null;
+        globalUpdateUI?.(); // ✨ MISE À JOUR UI
       }
     };
 
@@ -101,7 +189,7 @@ const InputWithMicrophone = React.memo(
               color: colors.text,
               backgroundColor: colors.card,
               borderColor: colors.border,
-              paddingRight: 56,
+              paddingRight: 100, // ✨ Plus d'espace pour le texte "Écoute..."
             },
             style,
           ]}
@@ -109,22 +197,53 @@ const InputWithMicrophone = React.memo(
           numberOfLines={numberOfLines}
           textAlignVertical={multiline ? 'top' : 'center'}
         />
-        <TouchableOpacity
-          style={[
-            styles.micButton,
-            {
-              backgroundColor:
-                isListening === fieldName ? '#ff6b6b' : colors.tint,
-            },
-          ]}
-          onPress={() => startVoiceRecognition(fieldName)}
+        <View
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
         >
-          <IconSymbol
-            name='mic.fill'
-            size={18}
-            color={isListening === fieldName ? '#fff' : '#fff'}
-          />
-        </TouchableOpacity>
+          {globalIsListening && currentActiveField === fieldName && (
+            <ThemedText
+              style={{
+                color: '#ff4757',
+                fontSize: 12,
+                marginRight: 4,
+                fontWeight: '600',
+              }}
+            >
+              🎤 Écoute...
+            </ThemedText>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.micButtonInner, // ✨ Nouveau style sans position absolue
+              {
+                backgroundColor:
+                  globalIsListening && currentActiveField === fieldName
+                    ? '#ff4757'
+                    : colors.tint,
+                transform:
+                  globalIsListening && currentActiveField === fieldName
+                    ? [{ scale: 1.1 }]
+                    : [{ scale: 1 }],
+              },
+            ]}
+            onPress={() => startVoiceRecognition(fieldName)}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              name='mic.fill'
+              size={
+                globalIsListening && currentActiveField === fieldName ? 20 : 18
+              }
+              color='#fff'
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -543,6 +662,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 12,
     top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  micButtonInner: {
     width: 36,
     height: 36,
     borderRadius: 18,

@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Linking,
   Platform,
   SafeAreaView,
@@ -23,11 +24,28 @@ import {
   updatePrompt,
 } from '@/services/promptService';
 
+// Interface pour les plateformes IA
+interface AIPlatform {
+  id: string;
+  name: string;
+  icon?: string; // Emoji fallback
+  logo?: any; // Logo SVG/PNG
+  color: string;
+  iosStore: string;
+  androidStore: string;
+  webFallback: string;
+  iosScheme?: string;
+  androidScheme?: string;
+}
+
 // Plateformes IA disponibles
-const AI_PLATFORMS = [
+const AI_PLATFORMS: AIPlatform[] = [
   {
     id: 'chatgpt',
     name: 'ChatGPT',
+    logo: require('@/assets/images/logos/chatgpt.png'),
+    icon: '🤖', // Fallback emoji
+    color: '#10a37f', // Couleur officielle OpenAI
     // PRIORITÉ : APP NATIVE VIA STORE !
     iosStore: 'https://apps.apple.com/app/chatgpt/id1448792446',
     androidStore:
@@ -37,6 +55,9 @@ const AI_PLATFORMS = [
   {
     id: 'gemini',
     name: 'Gemini',
+    logo: require('@/assets/images/logos/gemini.png'),
+    icon: '✨', // Fallback emoji
+    color: '#4285f4', // Couleur Google Blue
     // PRIORITÉ : APP NATIVE VIA STORE !
     iosStore: 'https://apps.apple.com/app/gemini-ai-assistant/id1596370896',
     androidStore:
@@ -45,22 +66,14 @@ const AI_PLATFORMS = [
   },
   {
     id: 'grok',
-    name: 'Grok - Assistant IA',
+    name: 'Grok',
+    logo: require('@/assets/images/logos/grok.png'),
+    icon: '🚀', // Fallback emoji
+    color: '#1da1f2', // Couleur X/Twitter
     // APP xAI séparée → STORE DIRECT !
     iosStore: 'https://apps.apple.com/app/grok/id6499194723',
     androidStore: 'https://play.google.com/store/apps/details?id=ai.x.grok',
     webFallback: 'https://x.ai/',
-  },
-  {
-    id: 'twitter',
-    name: 'X (Twitter)',
-    // SCHEMES NATIFS ÉPROUVÉS → APP DIRECTE !
-    iosScheme: 'twitter://',
-    androidScheme: 'twitter://',
-    iosStore: 'https://apps.apple.com/app/x/id333903271',
-    androidStore:
-      'https://play.google.com/store/apps/details?id=com.twitter.android',
-    webFallback: 'https://twitter.com/',
   },
 ];
 
@@ -401,6 +414,17 @@ export default function GeneratedScreen() {
                 ]}
                 onPress={() => setSelectedPlatform(platform)}
               >
+                {platform.logo ? (
+                  <Image
+                    source={platform.logo}
+                    style={styles.platformLogo}
+                    resizeMode='contain'
+                  />
+                ) : (
+                  <ThemedText style={styles.platformIcon}>
+                    {platform.icon}
+                  </ThemedText>
+                )}
                 <ThemedText
                   style={[
                     styles.platformText,
@@ -423,13 +447,26 @@ export default function GeneratedScreen() {
         <TouchableOpacity
           style={[
             styles.goButton,
-            { backgroundColor: (colors as any).purple || '#6366f1' },
+            { backgroundColor: selectedPlatform.color || '#6366f1' },
           ]}
           onPress={handleGoToPlatform}
         >
-          <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
-            📱 Ouvrir {selectedPlatform.name}
-          </ThemedText>
+          {selectedPlatform.logo ? (
+            <ThemedView style={styles.goButtonContent}>
+              <Image
+                source={selectedPlatform.logo}
+                style={styles.goButtonLogo}
+                resizeMode='contain'
+              />
+              <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
+                Ouvrir {selectedPlatform.name}
+              </ThemedText>
+            </ThemedView>
+          ) : (
+            <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
+              {selectedPlatform.icon} Ouvrir {selectedPlatform.name}
+            </ThemedText>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -517,25 +554,50 @@ const styles = StyleSheet.create({
   },
   platformContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between',
   },
   platformButton: {
-    flex: 1,
+    minWidth: 80,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    maxWidth: '48%', // Deux par ligne max
+  },
+  platformIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  platformLogo: {
+    width: 24,
+    height: 24,
+    marginBottom: 4,
   },
   platformText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
+    textAlign: 'center',
   },
   goButton: {
     borderRadius: 12,
     paddingVertical: 18,
     alignItems: 'center',
     marginBottom: 40,
+  },
+  goButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  goButtonLogo: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
   },
   goButtonText: {
     fontSize: 18,

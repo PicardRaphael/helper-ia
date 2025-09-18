@@ -14,7 +14,11 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { deletePrompt, getAllPrompts, SavedPrompt } from '@/services/promptService';
+import {
+  deletePrompt,
+  getAllPrompts,
+  SavedPrompt,
+} from '@/services/promptService';
 
 // Composant pour une carte de prompt dans la liste
 function PromptCard({
@@ -126,6 +130,38 @@ export default function HistoriqueScreen() {
     });
   };
 
+  // Supprimer un prompt avec confirmation
+  const handleDeletePrompt = useCallback(
+    (prompt: SavedPrompt) => {
+      Alert.alert(
+        'Supprimer le prompt',
+        `Voulez-vous vraiment supprimer "${prompt.name}" ?`,
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel',
+          },
+          {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await deletePrompt(prompt.id);
+                console.log(`🗑️ Prompt "${prompt.name}" supprimé`);
+                // Recharger la liste après suppression
+                loadPrompts();
+              } catch (error) {
+                console.error('Erreur lors de la suppression:', error);
+                Alert.alert('Erreur', 'Impossible de supprimer le prompt');
+              }
+            },
+          },
+        ]
+      );
+    },
+    [loadPrompts]
+  );
+
   // Rendu de l'état vide
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -173,6 +209,7 @@ export default function HistoriqueScreen() {
           <PromptCard
             prompt={item}
             onPress={() => handlePromptPress(item)}
+            onDelete={() => handleDeletePrompt(item)}
             colors={colors}
           />
         )}
@@ -246,9 +283,19 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  dateAndActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   promptDate: {
     fontSize: 12,
     opacity: 0.7,
+  },
+  deleteButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
   },
   promptPreview: {
     fontSize: 14,
