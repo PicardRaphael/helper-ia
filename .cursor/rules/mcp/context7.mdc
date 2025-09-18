@@ -1,7 +1,7 @@
 ---
 description: Always fetch up-to-date library documentation using Context7 MCP before implementing or using any external tools.
 globs:
-alwaysApply: false
+alwaysApply: true
 ---
 
 ## Context

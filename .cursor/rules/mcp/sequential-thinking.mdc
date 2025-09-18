@@ -1,5 +1,39 @@
 ---
-description:
-globs:
+description: Force the agent to use the Sequential-Thinking MCP BEFORE any action (tools, edits, commands, web, codegen).
+tags: [governance, planning, safety, mcp]
+priority: highest
 alwaysApply: true
 ---
+
+## Context
+
+The **sequential-thinking** MCP produces a structured operational plan (numbered steps, assumptions, risks, success criteria) from a goal.
+This plan MUST be generated and consulted **before any action**.
+
+## Mandatory Rules
+
+1. **Pre-action requirement**
+   Before **any** action (tool call, command execution, code change, web browse, file write, API request), call the `sequential-thinking` MCP with:
+
+   - the current goal,
+   - active context/rules,
+   - current work state (open files, relevant diffs),
+   - known constraints (time, tokens, costs, safety).
+
+2. **Expected MCP output**
+   The MCP must return at least:
+
+   - **Plan**: 3–7 numbered steps, each with _goal_, _inputs_, _expected output_.
+   - **Assumptions / Unknowns**.
+   - **Risks** + mitigations.
+   - **Success criteria** for the **next step** (measurable).
+   - **Decision point** (when to re-plan).
+
+3. **Stepwise execution**
+
+   - Execute **only step 1** of the plan.
+   - After execution, **validate** against the success criteria; if not met → **re-call** `sequential-thinking` to adjust the plan.
+   - Move to the next step only when criteria are met.
+
+4. **Minimal traceability**
+   - Before each action, keep (internall

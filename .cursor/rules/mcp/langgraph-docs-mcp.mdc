@@ -1,0 +1,83 @@
+---
+description: Always validate LangGraph/LangChain usage against up-to-date official docs via langgraph-docs-mcp BEFORE any import, install, or API call.
+tags: [governance, docs-check, safety, mcp, langgraph, langchain]
+priority: highest
+alwaysApply: true
+---
+
+## Context
+
+The **langgraph-docs-mcp** provides fast access to the latest official references for **LangGraph** and **LangChain**.
+
+## Trigger
+
+Run **langgraph-docs-mcp** whenever ANY of the following is true:
+
+- The goal/plan mentions **LangGraph** or **LangChain**.
+- The code adds/edits imports like: `langgraph`, `langchain`, `langchain_community`, `langchain_openai`, `langsmith`, `langgraph_sdk`.
+- An action would install/update related packages (e.g., `pip/uv add langgraph langchain ...`).
+- You’re about to call or refactor any function/class from those libs.
+
+## Mandatory Rules
+
+1. **Pre-action docs check**
+   Before **any** action involving LangGraph/LangChain, call the MCP `langgraph-docs-mcp` with:
+
+   - **Intent**: planned APIs/classes/functions to use/refactor.
+   - **Env snapshot**: Python version, and if available package versions (`pip/uv freeze | grep -i 'langgraph\|langchain'`).
+   - **Constraints**: tokens/cost/time, target runtime (Node/Python), and safety constraints.
+
+2. **Required MCP Output**
+   The MCP response must include at least:
+
+   - **Canonical references** (links/titles) for each mentioned API.
+   - **Current signatures** with required/optional params and defaults.
+   - **Deprecations/migrations** (breaking changes, renamed modules).
+   - **Minimal correct snippet** per API (Python).
+   - **Version notes** (if your local version differs from the latest, show both or point to versioned docs).
+
+3. **Gate the action**
+
+   - If any API in plan/intent is **missing** from MCP output → **STOP** and re-query MCP with a more specific prompt.
+   - If signatures in code/plan **don’t match** MCP → **STOP**, update plan, then proceed.
+   - After applying changes, **validate** against MCP success criteria (see below). If not met → re-check docs.
+
+4. **Traceability**
+   Keep (internally) for each doc-check: _query_, _doc URLs/titles_, _APIs validated_, _version notes_, _decision_.
+
+## Safeguards (Refusals)
+
+- No MCP response, empty, or lacking explicit API signatures → **REFUSE** to proceed and re-run `langgraph-docs-mcp`.
+- Detected deprecation/breaking change without an updated plan → **REFUSE** and re-plan.
+- Version mismatch with ambiguous behavior (e.g., code uses 0.x, docs for 1.x) → **REFUSE** until versioned docs are verified.
+
+## Prompt template to send to `langgraph-docs-mcp`
+
+> **System/Instruction**
+> You validate LangGraph/LangChain usage. Return authoritative, current references and minimal correct code snippets.
+> **Goal**: {{what we’re trying to build/change}} > **Planned APIs**: {{classes/functions/modules}} > **Env**: Python {{py_version}}, packages: {{langgraph/langchain versions if known}} > **Constraints**: {{time/tokens/runtime}}
+>
+> **REQUIRED OUTPUT FORMAT**
+>
+> - References (per API): Title — URL — library — min version
+> - Signatures: exact function/class signatures with required/optional params
+> - Deprecations/Migrations: notes + replacement guidance
+> - Minimal Correct Snippets (Python)
+> - Version Notes: differences between our installed version and latest
+> - Quick Checklist: parameters to double-check before running
+
+## Examples
+
+**Before**: “Create a LangGraph workflow with a ToolNode and state graph.”
+**Action**: STOP → call `langgraph-docs-mcp`.
+**After**: You get current `StateGraph`/`ToolNode` signatures + snippet; update plan if API changed.
+
+**Before**: “Use LangChain’s Runnable to compose retriever + LLM with streaming.”
+**Action**: STOP → docs check.
+**After**: Confirm `Runnable` pipeline and streaming APIs; adjust params accordingly.
+
+## Implementation Notes
+
+- Place this rule **above** non-doc rules. Keep **sequential-thinking** as the very first rule globally, then this docs rule immediately after for LangGraph/LangChain work.
+- Prefer **versioned** references when your local versions differ from latest.
+- Cache doc URLs/snippets in the working note, but **never skip** the MCP check on the basis of cache alone.
