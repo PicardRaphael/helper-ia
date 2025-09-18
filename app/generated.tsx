@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -14,6 +14,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -95,9 +96,10 @@ export default function GeneratedScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
+  const { t } = useTranslation();
   const { promptId, source } = useLocalSearchParams<{
     promptId: string;
-    source?: string;
+    source?: 'form' | 'history';
   }>();
 
   const [prompt, setPrompt] = useState<SavedPrompt | null>(null);
@@ -108,11 +110,6 @@ export default function GeneratedScreen() {
   const [loading, setLoading] = useState(true);
   const [showPlatformModal, setShowPlatformModal] = useState(false);
 
-  // Charger le prompt
-  useEffect(() => {
-    loadPrompt();
-  }, [promptId]);
-
   // Détecter les changements
   useEffect(() => {
     if (prompt) {
@@ -122,7 +119,7 @@ export default function GeneratedScreen() {
     }
   }, [editedName, editedPrompt, prompt]);
 
-  const loadPrompt = async () => {
+  const loadPrompt = useCallback(async () => {
     try {
       if (promptId) {
         const loadedPrompt = await getPromptById(promptId);
@@ -131,17 +128,29 @@ export default function GeneratedScreen() {
           setEditedName(loadedPrompt.name);
           setEditedPrompt(loadedPrompt.generatedPrompt);
         } else {
-          Alert.alert('Erreur', 'Prompt non trouvé');
+          Alert.alert(
+            t('common.status.error'),
+            t('screens.generated.empty.notFound')
+          );
           router.back();
         }
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de charger le prompt');
+      console.error('Erreur chargement prompt:', error);
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.generated.alerts.loadError')
+      );
       router.back();
     } finally {
       setLoading(false);
     }
-  };
+  }, [promptId, router, t]);
+
+  // Charger le prompt
+  useEffect(() => {
+    loadPrompt();
+  }, [loadPrompt]);
 
   const handleSave = async () => {
     if (!prompt) return;
@@ -149,29 +158,47 @@ export default function GeneratedScreen() {
     try {
       await updatePrompt(prompt.id, {
         promptName: editedName.trim(),
-        // On peut ajouter d'autres champs si nécessaire
+        generatedPrompt: editedPrompt,
       });
 
-      // Mettre à jour l'état local
       setPrompt((prev) =>
         prev
-          ? { ...prev, name: editedName.trim(), updatedAt: new Date() }
+          ? {
+              ...prev,
+              name: editedName.trim(),
+              generatedPrompt: editedPrompt,
+              updatedAt: new Date(),
+            }
           : null
       );
       setHasChanges(false);
 
-      Alert.alert('Succès', 'Prompt sauvegardé avec succès');
+      Alert.alert(
+        t('common.status.success'),
+        t('screens.generated.alerts.saveSuccess')
+      );
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de sauvegarder les modifications');
+      console.error('Erreur sauvegarde prompt:', error);
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.generated.alerts.saveError')
+      );
     }
   };
 
   const handleCopy = async () => {
     try {
       await Clipboard.setStringAsync(editedPrompt);
-      Alert.alert('Copié !', 'Le prompt a été copié dans le presse-papiers');
+      Alert.alert(
+        t('common.status.success'),
+        t('screens.generated.alerts.copySuccess')
+      );
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de copier le prompt');
+      console.error('Erreur copie prompt:', error);
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.generated.alerts.copyError')
+      );
     }
   };
 
@@ -199,7 +226,9 @@ export default function GeneratedScreen() {
             await Linking.openURL(platform.iosScheme);
             return;
           }
-        } catch {}
+        } catch (error) {
+          console.log('Scheme iOS indisponible:', error);
+        }
       }
 
       // Android: ouverture explicite du composant LAUNCHER si connu
@@ -220,7 +249,10 @@ export default function GeneratedScreen() {
             );
             return;
           } catch (componentErr) {
-            console.log('❌ COMPONENT échoué, tentative MAIN package');
+            console.log(
+              '❌ COMPONENT échoué, tentative MAIN package',
+              componentErr
+            );
           }
         }
         // Fallback: tenter MAIN sur le package
@@ -236,7 +268,7 @@ export default function GeneratedScreen() {
           );
           return;
         } catch (intentErr) {
-          console.log('❌ MAIN échoué, on proposera le store');
+          console.log(`❌ MAIN échoué, on proposera le store : ${intentErr}`);
         }
       }
 
@@ -244,12 +276,16 @@ export default function GeneratedScreen() {
       const storeUrl = isIOS ? platform.iosStore : platform.androidStore;
       if (storeUrl) {
         Alert.alert(
-          `${platform.name} pas installé`,
-          `L'app ${platform.name} n'est pas installée. Voulez-vous l'installer ?`,
+          t('screens.generated.alerts.platformNotInstalledTitle', {
+            platform: platform.name,
+          }),
+          t('screens.generated.alerts.platformNotInstalledMessage', {
+            platform: platform.name,
+          }),
           [
-            { text: 'Annuler', style: 'cancel' },
+            { text: t('common.actions.cancel'), style: 'cancel' },
             {
-              text: 'Installer',
+              text: t('common.actions.install'),
               onPress: async () => {
                 try {
                   await Linking.openURL(storeUrl);
@@ -257,7 +293,11 @@ export default function GeneratedScreen() {
                     `🎯 STORE ouvert pour installer ${platform.name} !`
                   );
                 } catch (storeError) {
-                  Alert.alert('Erreur', `Impossible d'ouvrir le store`);
+                  console.log(storeError);
+                  Alert.alert(
+                    t('common.status.error'),
+                    t('screens.generated.alerts.platformStoreError')
+                  );
                 }
               },
             },
@@ -265,13 +305,20 @@ export default function GeneratedScreen() {
         );
       } else {
         Alert.alert(
-          'App non disponible',
-          `L'app ${platform.name} n'est pas disponible sur cette plateforme.`
+          t('screens.generated.alerts.platformNotAvailableTitle'),
+          t('screens.generated.alerts.platformNotAvailableMessage', {
+            platform: platform.name,
+          })
         );
       }
     } catch (error) {
       console.error('💥 ERREUR APP:', error);
-      Alert.alert('Erreur', `Impossible d'ouvrir l'app ${platform.name}`);
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.generated.alerts.platformOpenError', {
+          platform: platform.name,
+        })
+      );
     }
   };
 
@@ -286,8 +333,8 @@ export default function GeneratedScreen() {
     } catch (error) {
       console.error('💥 ERREUR WEB:', error);
       Alert.alert(
-        'Erreur',
-        `Impossible d'ouvrir ${platform.name} dans le navigateur`
+        t('common.status.error'),
+        t('screens.generated.alerts.webOpenError', { platform: platform.name })
       );
     }
   };
@@ -295,17 +342,17 @@ export default function GeneratedScreen() {
   const handleBack = () => {
     if (hasChanges) {
       Alert.alert(
-        'Modifications non sauvegardées',
-        'Voulez-vous sauvegarder vos modifications avant de quitter ?',
+        t('screens.generated.alerts.unsavedTitle'),
+        t('screens.generated.alerts.unsavedMessage'),
         [
           {
-            text: 'Quitter sans sauvegarder',
+            text: t('screens.generated.alerts.unsavedDiscard'),
             onPress: () => router.back(),
             style: 'destructive',
           },
-          { text: 'Annuler', style: 'cancel' },
+          { text: t('common.actions.cancel'), style: 'cancel' },
           {
-            text: 'Sauvegarder',
+            text: t('screens.generated.alerts.unsavedSave'),
             onPress: async () => {
               await handleSave();
               router.back();
@@ -315,10 +362,10 @@ export default function GeneratedScreen() {
       );
     } else {
       // Retour intelligent : formulaire si source='form', historique sinon
-      if (source === 'form') {
-        router.push('/(tabs)/prompt');
-      } else {
+      if (source === 'history') {
         router.push('/(tabs)/historique');
+      } else {
+        router.push('/(tabs)/prompt');
       }
     }
   };
@@ -329,7 +376,9 @@ export default function GeneratedScreen() {
         style={[styles.container, { backgroundColor: colors.background }]}
       >
         <ThemedView style={styles.loadingContainer}>
-          <ThemedText style={{ color: colors.text }}>Chargement...</ThemedText>
+          <ThemedText style={{ color: colors.text }}>
+            {t('screens.generated.empty.loading')}
+          </ThemedText>
         </ThemedView>
       </SafeAreaView>
     );
@@ -342,7 +391,7 @@ export default function GeneratedScreen() {
       >
         <ThemedView style={styles.loadingContainer}>
           <ThemedText style={{ color: colors.text }}>
-            Prompt non trouvé
+            {t('screens.generated.empty.notFound')}
           </ThemedText>
         </ThemedView>
       </SafeAreaView>
@@ -359,7 +408,7 @@ export default function GeneratedScreen() {
           <IconSymbol name='chevron.left' size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText type='title' style={styles.headerTitle}>
-          Prompt généré
+          {t('screens.generated.title')}
         </ThemedText>
         <ThemedView style={styles.headerSpacer} />
       </ThemedView>
@@ -368,7 +417,7 @@ export default function GeneratedScreen() {
         {/* Nom du prompt */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Nom du prompt :
+            {t('screens.generated.fields.nameLabel')}
           </ThemedText>
           <TextInput
             style={[
@@ -381,7 +430,7 @@ export default function GeneratedScreen() {
             ]}
             value={editedName}
             onChangeText={setEditedName}
-            placeholder='Nom du prompt'
+            placeholder={t('screens.generated.fields.namePlaceholder')}
             placeholderTextColor={colors.icon}
           />
         </ThemedView>
@@ -389,7 +438,7 @@ export default function GeneratedScreen() {
         {/* Prompt généré */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Prompt généré :
+            {t('screens.generated.fields.promptLabel')}
           </ThemedText>
           <TextInput
             style={[
@@ -405,7 +454,7 @@ export default function GeneratedScreen() {
             multiline
             numberOfLines={12}
             textAlignVertical='top'
-            placeholder='Contenu du prompt...'
+            placeholder={t('screens.generated.fields.promptPlaceholder')}
             placeholderTextColor={colors.icon}
           />
         </ThemedView>
@@ -420,7 +469,7 @@ export default function GeneratedScreen() {
             onPress={handleSave}
           >
             <ThemedText style={[styles.saveButtonText, { color: '#000' }]}>
-              Enregistrer les modifications
+              {t('screens.generated.actions.saveChanges')}
             </ThemedText>
           </TouchableOpacity>
         )}
@@ -435,14 +484,14 @@ export default function GeneratedScreen() {
         >
           <IconSymbol name='doc.text' size={20} color={colors.text} />
           <ThemedText style={[styles.copyButtonText, { color: colors.text }]}>
-            Copier le prompt
+            {t('screens.generated.actions.copyPrompt')}
           </ThemedText>
         </TouchableOpacity>
 
         {/* Sélection plateforme IA */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            📱 Ouvrir dans :
+            {t('screens.generated.actions.openIn')}
           </ThemedText>
           <ThemedView style={styles.platformContainer}>
             {AI_PLATFORMS.map((platform) => (
@@ -503,12 +552,17 @@ export default function GeneratedScreen() {
                 resizeMode='contain'
               />
               <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
-                Ouvrir {selectedPlatform.name}
+                {t('screens.generated.actions.goTo', {
+                  name: selectedPlatform.name,
+                })}
               </ThemedText>
             </ThemedView>
           ) : (
             <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
-              {selectedPlatform.icon} Ouvrir {selectedPlatform.name}
+              {selectedPlatform.icon}{' '}
+              {t('screens.generated.actions.goTo', {
+                name: selectedPlatform.name,
+              })}
             </ThemedText>
           )}
         </TouchableOpacity>
@@ -527,7 +581,9 @@ export default function GeneratedScreen() {
               {/* Header */}
               <ThemedView style={styles.modalHeader}>
                 <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
-                  Ouvrir {selectedPlatform.name}
+                  {t('screens.generated.actions.goTo', {
+                    name: selectedPlatform.name,
+                  })}
                 </ThemedText>
               </ThemedView>
 
@@ -551,12 +607,12 @@ export default function GeneratedScreen() {
                   <ThemedText
                     style={[styles.modalButtonText, { color: '#fff' }]}
                   >
-                    📱 Application
+                    {t('screens.generated.actions.appButton')}
                   </ThemedText>
                   <ThemedText
                     style={[styles.modalButtonSubtext, { color: '#fff' }]}
                   >
-                    Ouvrir l'app native
+                    {t('screens.generated.actions.appSubtitle')}
                   </ThemedText>
                 </TouchableOpacity>
 
@@ -575,12 +631,12 @@ export default function GeneratedScreen() {
                       { color: selectedPlatform.color || '#6366f1' },
                     ]}
                   >
-                    🌐 Navigateur
+                    {t('screens.generated.actions.webButton')}
                   </ThemedText>
                   <ThemedText
                     style={[styles.modalButtonSubtext, { color: colors.text }]}
                   >
-                    Ouvrir dans le navigateur
+                    {t('screens.generated.actions.webSubtitle')}
                   </ThemedText>
                 </TouchableOpacity>
               </ThemedView>
@@ -593,7 +649,7 @@ export default function GeneratedScreen() {
                 <ThemedText
                   style={[styles.modalCancelText, { color: colors.text }]}
                 >
-                  Annuler
+                  {t('screens.generated.actions.cancel')}
                 </ThemedText>
               </TouchableOpacity>
             </ThemedView>

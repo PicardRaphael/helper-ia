@@ -8,7 +8,32 @@ import { Platform } from 'react-native';
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#40E0D0'; // Turquoise accent like in mockups
 
-export const Colors = {
+export type ElevationPalette = {
+  level0: string;
+  level1: string;
+  level2: string;
+  level3: string;
+  level4: string;
+  level5: string;
+};
+
+type ColorPalette = {
+  text: string;
+  background: string;
+  tint: string;
+  icon: string;
+  tabIconDefault: string;
+  tabIconSelected: string;
+  card: string;
+  border: string;
+  accent: string;
+  purple: string;
+  elevation: ElevationPalette;
+};
+
+export type ThemeName = 'light' | 'dark';
+
+export const Colors: Record<ThemeName, ColorPalette> = {
   light: {
     text: '#11181C',
     background: '#fff',
@@ -50,6 +75,12 @@ export const Colors = {
     },
   },
 };
+
+type StringColorKeys<T> = {
+  [K in keyof T]: T[K] extends string ? K : never;
+}[keyof T];
+
+export type ThemeColorKey = StringColorKeys<ColorPalette>;
 
 export const Fonts = Platform.select({
   ios: {

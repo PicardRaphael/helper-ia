@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -9,10 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { getToneLabel, resolveToneKey } from '@/constants/tones';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   deletePrompt,
@@ -20,7 +22,6 @@ import {
   SavedPrompt,
 } from '@/services/promptService';
 
-// Composant pour une carte de prompt dans la liste
 function PromptCard({
   prompt,
   onPress,
@@ -32,11 +33,21 @@ function PromptCard({
   onDelete: () => void;
   colors: any;
 }) {
-  // Tronquer la demande principale pour l'aperçu
+  const { t, i18n } = useTranslation();
   const truncatedRequest =
     prompt.mainRequest.length > 80
       ? prompt.mainRequest.substring(0, 80) + '...'
       : prompt.mainRequest;
+  const locale = useMemo(
+    () => (i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'),
+    [i18n.language]
+  );
+  const toneKey = resolveToneKey(prompt.tone);
+  const toneLabel = toneKey ? getToneLabel(toneKey, t) : prompt.tone;
+  const formattedDate = useMemo(
+    () => new Date(prompt.createdAt).toLocaleDateString(locale),
+    [prompt.createdAt, locale]
+  );
 
   return (
     <TouchableOpacity
@@ -53,7 +64,7 @@ function PromptCard({
         </ThemedText>
         <View style={styles.dateAndActions}>
           <ThemedText style={[styles.promptDate, { color: colors.icon }]}>
-            {new Date(prompt.createdAt).toLocaleDateString('fr-FR')}
+            {formattedDate}
           </ThemedText>
           <TouchableOpacity
             style={styles.deleteButton}
@@ -71,7 +82,7 @@ function PromptCard({
 
       <View style={styles.cardFooter}>
         <ThemedText style={[styles.promptTone, { color: colors.tint }]}>
-          {prompt.tone}
+          {toneLabel}
         </ThemedText>
         <IconSymbol name='chevron.right' size={16} color={colors.icon} />
       </View>
@@ -83,16 +94,15 @@ export default function HistoriqueScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Charger les prompts
   const loadPrompts = useCallback(async () => {
     try {
       const savedPrompts = await getAllPrompts();
-      // Trier par date de création (plus récent en premier)
       const sortedPrompts = savedPrompts.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -100,49 +110,44 @@ export default function HistoriqueScreen() {
       setPrompts(sortedPrompts);
     } catch (error) {
       console.error('Erreur lors du chargement des prompts:', error);
+      Alert.alert(t('common.status.error'), t('screens.history.errors.load'));
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
-  // Charger au démarrage
   useEffect(() => {
     loadPrompts();
   }, [loadPrompts]);
 
-  // Pull to refresh
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadPrompts();
   }, [loadPrompts]);
 
-  // Navigation vers l'écran généré
   const handlePromptPress = (prompt: SavedPrompt) => {
     router.push({
       pathname: '/generated',
       params: {
         promptId: prompt.id,
-        generatedPrompt: prompt.generatedPrompt,
-        promptName: prompt.name,
-        fromHistory: 'true', // Indiquer qu'on vient de l'historique
+        source: 'history',
       },
     });
   };
 
-  // Supprimer un prompt avec confirmation
   const handleDeletePrompt = useCallback(
     (prompt: SavedPrompt) => {
       Alert.alert(
-        'Supprimer le prompt',
-        `Voulez-vous vraiment supprimer "${prompt.name}" ?`,
+        t('screens.history.deleteTitle'),
+        t('screens.history.deleteMessage', { name: prompt.name }),
         [
           {
-            text: 'Annuler',
+            text: t('common.actions.cancel'),
             style: 'cancel',
           },
           {
-            text: 'Supprimer',
+            text: t('common.actions.delete'),
             style: 'destructive',
             onPress: async () => {
               try {
@@ -152,17 +157,19 @@ export default function HistoriqueScreen() {
                 loadPrompts();
               } catch (error) {
                 console.error('Erreur lors de la suppression:', error);
-                Alert.alert('Erreur', 'Impossible de supprimer le prompt');
+                Alert.alert(
+                  t('common.status.error'),
+                  t('screens.history.errors.delete')
+                );
               }
             },
           },
         ]
       );
     },
-    [loadPrompts]
+    [loadPrompts, t]
   );
 
-  // Rendu de l'état vide
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <IconSymbol
@@ -172,17 +179,17 @@ export default function HistoriqueScreen() {
         style={styles.emptyIcon}
       />
       <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
-        Aucun prompt sauvegardé
+        {t('screens.history.emptyTitle')}
       </ThemedText>
       <ThemedText style={[styles.emptyDescription, { color: colors.icon }]}>
-        Créez votre premier prompt pour le voir apparaître ici
+        {t('screens.history.emptyDescription')}
       </ThemedText>
       <TouchableOpacity
         style={[styles.createButton, { backgroundColor: colors.tint }]}
         onPress={() => router.push('/(tabs)/prompt')}
       >
         <ThemedText style={[styles.createButtonText, { color: '#fff' }]}>
-          Créer un prompt
+          {t('common.actions.createPrompt')}
         </ThemedText>
       </TouchableOpacity>
     </View>
@@ -194,11 +201,10 @@ export default function HistoriqueScreen() {
     >
       <View style={styles.header}>
         <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-          Historique
+          {t('screens.history.title')}
         </ThemedText>
         <ThemedText style={[styles.headerSubtitle, { color: colors.icon }]}>
-          {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} sauvegardé
-          {prompts.length !== 1 ? 's' : ''}
+          {t('screens.history.subtitle', { count: prompts.length })}
         </ThemedText>
       </View>
 

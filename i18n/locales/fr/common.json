@@ -1,0 +1,180 @@
+{
+  "app": {
+    "name": "Helper IA"
+  },
+  "common": {
+    "actions": {
+      "cancel": "Annuler",
+      "delete": "Supprimer",
+      "install": "Installer",
+      "save": "Enregistrer",
+      "copy": "Copier",
+      "open": "Ouvrir {{name}}",
+      "openApp": "Ouvrir l'app native",
+      "openBrowser": "Ouvrir dans le navigateur",
+      "createPrompt": "Créer un prompt"
+    },
+    "status": {
+      "loading": "Chargement...",
+      "success": "Succès",
+      "error": "Erreur",
+      "copied": "Copié !"
+    },
+    "messages": {
+      "genericError": "Une erreur est survenue.",
+      "microphonePermission": "L'accès au micro est nécessaire pour la reconnaissance vocale.",
+      "listening": "Écoute..."
+    },
+    "language": {
+      "fr": "Français",
+      "en": "English"
+    },
+    "theme": {
+      "system": "Système",
+      "light": "Clair",
+      "dark": "Sombre"
+    }
+  },
+  "tones": {
+    "neutral": "Neutre / factuel",
+    "corporate": "Professionnel / corporate",
+    "direct": "No-bullshit / direct",
+    "assertive": "Assertif",
+    "technicalExpert": "Technique – niveau expert",
+    "technicalPedagogic": "Technique – pédagogique",
+    "friendly": "Amical / décontracté",
+    "enthusiastic": "Enthousiaste / motivant",
+    "creative": "Créatif / inspirant",
+    "humorous": "Humoristique / léger",
+    "empathetic": "Empathique / bienveillant",
+    "authoritative": "Autorité / expert",
+    "persuasive": "Vendeur / persuasif",
+    "educational": "Éducatif / informatif",
+    "storytelling": "Storytelling / narratif"
+  },
+  "promptSections": {
+    "role": "**Rôle :**",
+    "context": "**Contexte :**",
+    "request": "**Demande :**",
+    "example": "**Exemple/Style :**",
+    "format": "**Format souhaité :**",
+    "tone": "**Ton :**"
+  },
+  "screens": {
+    "prompt": {
+      "title": "Créer un prompt",
+      "fields": {
+        "name": "Nom du prompt",
+        "mainRequest": "Demande principale",
+        "role": "Rôle (optionnel)",
+        "context": "Contexte (optionnel)",
+        "exampleStyle": "Exemple/Style (optionnel)",
+        "responseFormat": "Format de réponse (optionnel)",
+        "tone": "Ton"
+      },
+      "placeholders": {
+        "name": "Ex: Email de relance client",
+        "mainRequest": "Décrivez ce que vous voulez que l'IA génère...",
+        "role": "Ex: Tu es un expert en marketing digital",
+        "context": "Informations de contexte importantes...",
+        "exampleStyle": "Exemples de style ou format souhaité...",
+        "responseFormat": "Ex: Liste à puces, JSON, paragraphe..."
+      },
+      "actions": {
+        "submit": "Envoyer",
+        "submitting": "Création en cours..."
+      },
+      "selectTone": "Sélectionner un ton",
+      "alerts": {
+        "recognitionTitle": "Reconnaissance",
+        "recognitionSuccess": "Texte reconnu : \"{{text}}\"",
+        "recognitionError": "Erreur de reconnaissance : {{message}}",
+        "permissionTitle": "Permission requise",
+        "validationName": "Le nom du prompt est obligatoire",
+        "validationMain": "La demande principale est obligatoire",
+        "creationError": "Une erreur est survenue lors de la création.",
+        "voiceError": "Reconnaissance vocale impossible."
+      }
+    },
+    "history": {
+      "title": "Historique",
+      "subtitle": "{{count}} prompt sauvegardé",
+      "subtitle_plural": "{{count}} prompts sauvegardés",
+      "emptyTitle": "Aucun prompt sauvegardé",
+      "emptyDescription": "Créez votre premier prompt pour le voir apparaître ici",
+      "deleteTitle": "Supprimer le prompt",
+      "deleteMessage": "Voulez-vous vraiment supprimer « {{name}} » ?",
+      "errors": {
+        "load": "Erreur lors du chargement des prompts.",
+        "delete": "Impossible de supprimer le prompt"
+      }
+    },
+    "settings": {
+      "title": "Paramètres",
+      "subtitle": "Configurez votre application selon vos préférences.",
+      "languageLabel": "🌍 Langues",
+      "languageHelper": "Localisation complète bientôt disponible.",
+      "themeLabel": "Thème",
+      "themeHelper": "Le thème s'applique instantanément dans l'application.",
+      "reviewLabel": "Évaluation",
+      "reviewDescription": "Noter l'application sur les stores",
+      "contactLabel": "Contact",
+      "contactDescription": "Nous contacter pour support ou suggestions",
+      "legalLabel": "Légales",
+      "legalDescription": "Politique de confidentialité et mentions légales",
+      "alerts": {
+        "openError": "Impossible d'ouvrir la page demandée.",
+        "openMailError": "Impossible d'ouvrir le client mail.",
+        "openStoreError": "Impossible d'ouvrir la page de notation."
+      }
+    },
+    "generated": {
+      "title": "Prompt généré",
+      "fields": {
+        "nameLabel": "Nom du prompt :",
+        "namePlaceholder": "Nom du prompt",
+        "promptLabel": "Prompt généré :",
+        "promptPlaceholder": "Contenu du prompt..."
+      },
+      "actions": {
+        "saveChanges": "Enregistrer les modifications",
+        "copyPrompt": "Copier le prompt",
+        "openIn": "📱 Ouvrir dans :",
+        "goTo": "Ouvrir {{name}}",
+        "appButton": "📱 Application",
+        "appSubtitle": "Ouvrir l'app native",
+        "webButton": "🌐 Navigateur",
+        "webSubtitle": "Ouvrir dans le navigateur",
+        "cancel": "Annuler"
+      },
+      "alerts": {
+        "saveSuccess": "Prompt sauvegardé avec succès",
+        "saveError": "Impossible de sauvegarder les modifications",
+        "copySuccess": "Le prompt a été copié dans le presse-papiers",
+        "copyError": "Impossible de copier le prompt",
+        "unsavedTitle": "Modifications non sauvegardées",
+        "unsavedMessage": "Voulez-vous sauvegarder vos modifications avant de quitter ?",
+        "unsavedDiscard": "Quitter sans sauvegarder",
+        "unsavedSave": "Sauvegarder",
+        "platformNotInstalledTitle": "{{platform}} pas installé",
+        "platformNotInstalledMessage": "L'app {{platform}} n'est pas installée. Voulez-vous l'installer ?",
+        "platformNotAvailableTitle": "App non disponible",
+        "platformNotAvailableMessage": "L'app {{platform}} n'est pas disponible sur cette plateforme.",
+        "platformStoreError": "Impossible d'ouvrir le store",
+        "platformOpenError": "Impossible d'ouvrir l'app {{platform}}",
+        "webOpenError": "Impossible d'ouvrir {{platform}} dans le navigateur",
+        "loadError": "Impossible de charger le prompt"
+      },
+      "empty": {
+        "loading": "Chargement...",
+        "notFound": "Prompt non trouvé"
+      }
+    }
+  },
+  "links": {
+    "contactEmail": "mailto:support@helper-ia.app",
+    "privacyPolicy": "https://helper-ia.app/mentions-legales",
+    "appStore": "https://apps.apple.com/app/id0000000000",
+    "playStore": "https://play.google.com/store/apps/details?id=com.helper.ia"
+  }
+}

@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import i18n from '@/i18n';
+import { getToneLabel, resolveToneKey } from '@/constants/tones';
+
 // Interface pour un prompt sauvegardé
 export interface SavedPrompt {
   id: string;
@@ -26,37 +29,46 @@ export interface PromptFormData {
   selectedTone: string;
 }
 
+// Interface pour mise à jour d'un prompt
+export interface PromptUpdateData {
+  promptName?: string;
+  mainRequest?: string;
+  role?: string;
+  context?: string;
+  exampleStyle?: string;
+  responseFormat?: string;
+  selectedTone?: string;
+  generatedPrompt?: string;
+}
+
 const STORAGE_KEY = '@helper_ia_prompts';
 
 // Génération du prompt formaté selon la structure
 export const generateFormattedPrompt = (data: PromptFormData): string => {
   let prompt = '';
+  const t = i18n.t.bind(i18n);
+  const toneKey = resolveToneKey(data.selectedTone);
+  const toneLabel = toneKey ? getToneLabel(toneKey, t) : data.selectedTone;
 
-  // Ajouter le rôle si présent
   if (data.role.trim()) {
-    prompt += `**Rôle :** ${data.role.trim()}\n\n`;
+    prompt += `${t('promptSections.role')} ${data.role.trim()}\n\n`;
   }
 
-  // Ajouter le contexte si présent
   if (data.context.trim()) {
-    prompt += `**Contexte :** ${data.context.trim()}\n\n`;
+    prompt += `${t('promptSections.context')} ${data.context.trim()}\n\n`;
   }
 
-  // Ajouter la demande principale (obligatoire)
-  prompt += `**Demande :** ${data.mainRequest.trim()}\n\n`;
+  prompt += `${t('promptSections.request')} ${data.mainRequest.trim()}\n\n`;
 
-  // Ajouter l'exemple/style si présent
   if (data.exampleStyle.trim()) {
-    prompt += `**Exemple/Style :** ${data.exampleStyle.trim()}\n\n`;
+    prompt += `${t('promptSections.example')} ${data.exampleStyle.trim()}\n\n`;
   }
 
-  // Ajouter le format de réponse si présent
   if (data.responseFormat.trim()) {
-    prompt += `**Format souhaité :** ${data.responseFormat.trim()}\n\n`;
+    prompt += `${t('promptSections.format')} ${data.responseFormat.trim()}\n\n`;
   }
 
-  // Ajouter le ton
-  prompt += `**Ton :** ${data.selectedTone}`;
+  prompt += `${t('promptSections.tone')} ${toneLabel}`;
 
   return prompt.trim();
 };
@@ -66,30 +78,34 @@ export const createPrompt = async (
   data: PromptFormData
 ): Promise<SavedPrompt> => {
   try {
-    const generatedPrompt = generateFormattedPrompt(data);
+    const toneKey = resolveToneKey(data.selectedTone);
+    const toneLabel = toneKey
+      ? getToneLabel(toneKey, i18n.t.bind(i18n))
+      : data.selectedTone;
+    const normalizedData: PromptFormData = {
+      ...data,
+      selectedTone: toneLabel,
+    };
+    const generatedPrompt = generateFormattedPrompt(normalizedData);
     const now = new Date();
 
     const newPrompt: SavedPrompt = {
-      id: Date.now().toString(), // Simple ID basé sur timestamp
+      id: Date.now().toString(),
       name: data.promptName.trim(),
       mainRequest: data.mainRequest.trim(),
       role: data.role.trim() || undefined,
       context: data.context.trim() || undefined,
       exampleStyle: data.exampleStyle.trim() || undefined,
       responseFormat: data.responseFormat.trim() || undefined,
-      tone: data.selectedTone,
+      tone: toneLabel,
       generatedPrompt,
       createdAt: now,
       updatedAt: now,
     };
 
-    // Récupérer les prompts existants
     const existingPrompts = await getAllPrompts();
-
-    // Ajouter le nouveau prompt au début de la liste
     const updatedPrompts = [newPrompt, ...existingPrompts];
 
-    // Sauvegarder
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPrompts));
 
     return newPrompt;
@@ -106,7 +122,6 @@ export const getAllPrompts = async (): Promise<SavedPrompt[]> => {
     if (!data) return [];
 
     const prompts = JSON.parse(data);
-    // Convertir les dates string en Date objects
     return prompts.map((prompt: any) => ({
       ...prompt,
       createdAt: new Date(prompt.createdAt),
@@ -134,7 +149,7 @@ export const getPromptById = async (
 // Mettre à jour un prompt
 export const updatePrompt = async (
   id: string,
-  updates: Partial<PromptFormData>
+  updates: PromptUpdateData
 ): Promise<SavedPrompt | null> => {
   try {
     const prompts = await getAllPrompts();
@@ -146,38 +161,50 @@ export const updatePrompt = async (
 
     const existingPrompt = prompts[promptIndex];
 
-    // Fusionner les mises à jour
-    const updatedData: PromptFormData = {
-      promptName: updates.promptName || existingPrompt.name,
-      mainRequest: updates.mainRequest || existingPrompt.mainRequest,
-      role: updates.role || existingPrompt.role || '',
-      context: updates.context || existingPrompt.context || '',
-      exampleStyle: updates.exampleStyle || existingPrompt.exampleStyle || '',
-      responseFormat:
-        updates.responseFormat || existingPrompt.responseFormat || '',
-      selectedTone: updates.selectedTone || existingPrompt.tone,
+    const mergedName = updates.promptName?.trim() ?? existingPrompt.name;
+    const mergedMainRequest = updates.mainRequest?.trim() ?? existingPrompt.mainRequest;
+    const mergedRoleRaw = updates.role ?? existingPrompt.role ?? '';
+    const mergedContextRaw = updates.context ?? existingPrompt.context ?? '';
+    const mergedExampleRaw =
+      updates.exampleStyle ?? existingPrompt.exampleStyle ?? '';
+    const mergedFormatRaw =
+      updates.responseFormat ?? existingPrompt.responseFormat ?? '';
+    const mergedToneRaw = updates.selectedTone ?? existingPrompt.tone;
+    const mergedToneKey = resolveToneKey(mergedToneRaw);
+    const toneLabelForPrompt = mergedToneKey
+      ? getToneLabel(mergedToneKey, i18n.t.bind(i18n))
+      : mergedToneRaw;
+
+    const mergedData: PromptFormData = {
+      promptName: mergedName,
+      mainRequest: mergedMainRequest,
+      role: mergedRoleRaw.trim(),
+      context: mergedContextRaw.trim(),
+      exampleStyle: mergedExampleRaw.trim(),
+      responseFormat: mergedFormatRaw.trim(),
+      selectedTone: toneLabelForPrompt,
     };
 
-    // Regénérer le prompt formaté
-    const generatedPrompt = generateFormattedPrompt(updatedData);
+    const mergedGeneratedPrompt =
+      updates.generatedPrompt !== undefined
+        ? updates.generatedPrompt.trim()
+        : generateFormattedPrompt(mergedData);
 
-    // Mettre à jour le prompt
     const updatedPrompt: SavedPrompt = {
       ...existingPrompt,
-      name: updatedData.promptName,
-      mainRequest: updatedData.mainRequest,
-      role: updatedData.role || undefined,
-      context: updatedData.context || undefined,
-      exampleStyle: updatedData.exampleStyle || undefined,
-      responseFormat: updatedData.responseFormat || undefined,
-      tone: updatedData.selectedTone,
-      generatedPrompt,
+      name: mergedName,
+      mainRequest: mergedMainRequest,
+      role: mergedData.role || undefined,
+      context: mergedData.context || undefined,
+      exampleStyle: mergedData.exampleStyle || undefined,
+      responseFormat: mergedData.responseFormat || undefined,
+      tone: toneLabelForPrompt,
+      generatedPrompt: mergedGeneratedPrompt,
       updatedAt: new Date(),
     };
 
     prompts[promptIndex] = updatedPrompt;
 
-    // Sauvegarder
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
 
     return updatedPrompt;

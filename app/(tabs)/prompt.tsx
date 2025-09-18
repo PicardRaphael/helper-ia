@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -14,43 +14,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { TONE_KEYS, type ToneKey, getToneLabel } from '@/constants/tones';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createPrompt, PromptFormData } from '@/services/promptService';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
-// Liste des tons selon project.md
-const TONES = [
-  'Neutre / factuel',
-  'Professionnel / corporate',
-  'No-bullshit / direct',
-  'Assertif',
-  'Technique – niveau expert',
-  'Technique – pédagogique',
-  'Amical / décontracté',
-  'Enthousiaste / motivant',
-  'Créatif / inspirant',
-  'Humoristique / léger',
-  'Empathique / bienveillant',
-  'Authorité / expert',
-  'Vendeur / persuasif',
-  'Éducatif / informatif',
-  'Storytelling / narratif',
-];
-
-// Variables globales pour tracker quel input est actif
-let currentActiveField: string | null = null;
-let currentActiveCallback: ((text: string) => void) | null = null;
-let globalIsListening: boolean = false;
-let globalUpdateUI: (() => void) | null = null;
-
-// Composant InputWithMicrophone (DÉPLACÉ EN DEHORS pour éviter les re-renders)
 const InputWithMicrophone = React.memo(
   ({
     value,
@@ -60,6 +36,10 @@ const InputWithMicrophone = React.memo(
     numberOfLines,
     fieldName,
     style,
+    onStartListening,
+    isListening,
+    isActive,
+    listeningLabel,
   }: {
     value: string;
     onChangeText: (text: string) => void;
@@ -68,113 +48,20 @@ const InputWithMicrophone = React.memo(
     numberOfLines?: number;
     fieldName: string;
     style?: any;
+    onStartListening: (
+      field: string,
+      callback: (text: string) => void
+    ) => Promise<void> | void;
+    isListening: boolean;
+    isActive: boolean;
+    listeningLabel: string;
   }) => {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'dark'];
-    const [uiUpdate, setUiUpdate] = useState(0); // Pour forcer les re-renders
 
-    // Fonction pour mettre à jour l'UI
-    const forceUIUpdate = () => setUiUpdate((prev) => prev + 1);
-    globalUpdateUI = forceUIUpdate;
-
-    // Gestion des événements de reconnaissance vocale (UNE SEULE FOIS GLOBALEMENT)
-    useSpeechRecognitionEvent('start', () => {
-      console.log('🎤 Reconnaissance démarrée pour:', currentActiveField);
-      globalIsListening = true;
-      globalUpdateUI?.(); // ✨ MISE À JOUR UI
-    });
-
-    useSpeechRecognitionEvent('end', () => {
-      console.log('🎤 Reconnaissance terminée');
-      globalIsListening = false;
-      currentActiveField = null;
-      currentActiveCallback = null;
-      globalUpdateUI?.(); // ✨ MISE À JOUR UI
-    });
-
-    useSpeechRecognitionEvent('result', (event) => {
-      console.log('📝 Résultat pour:', currentActiveField, event.results);
-
-      // SEULEMENT mettre à jour l'input actif
-      if (
-        currentActiveField === fieldName &&
-        currentActiveCallback &&
-        event.results &&
-        event.results.length > 0
-      ) {
-        const spokenText = event.results[0]?.transcript || '';
-
-        if (spokenText.trim()) {
-          // 🔄 REMPLACER au lieu d'ajouter
-          currentActiveCallback(spokenText);
-
-          Alert.alert(
-            '✅ Reconnaissance réussie',
-            `Texte reconnu: "${spokenText}"`
-          );
-        }
-      }
-    });
-
-    useSpeechRecognitionEvent('error', (event) => {
-      console.error('❌ Erreur reconnaissance:', event.error, event.message);
-      globalIsListening = false;
-      currentActiveField = null;
-      currentActiveCallback = null;
-      globalUpdateUI?.(); // ✨ MISE À JOUR UI
-
-      // 🔇 Filtrer les erreurs normales (ne pas afficher de modal)
-      const normalErrors = ['no-speech', 'no-match', 'aborted'];
-      if (!normalErrors.includes(event.error)) {
-        Alert.alert(
-          'Erreur',
-          `Erreur de reconnaissance vocale: ${event.message}`
-        );
-      }
-    });
-
-    // Fonction de reconnaissance vocale avec expo-speech-recognition
-    const startVoiceRecognition = async (fieldName: string) => {
-      try {
-        if (globalIsListening) {
-          // Arrêter si déjà en cours
-          ExpoSpeechRecognitionModule.stop();
-          return;
-        }
-
-        // Demander les permissions d'abord
-        const result =
-          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-        if (!result.granted) {
-          Alert.alert(
-            'Permission requise',
-            "L'accès au microphone est nécessaire pour la reconnaissance vocale."
-          );
-          return;
-        }
-
-        console.log('🎤 Démarrage reconnaissance pour:', fieldName);
-
-        // DÉFINIR quel input est actif
-        currentActiveField = fieldName;
-        currentActiveCallback = onChangeText;
-
-        // Démarrer la reconnaissance vocale
-        ExpoSpeechRecognitionModule.start({
-          lang: 'fr-FR', // Français
-          interimResults: false, // 🔧 Désactivé pour éviter le flickering
-          continuous: false, // Une seule phrase
-          requiresOnDeviceRecognition: Platform.OS === 'ios', // Recommandé pour iOS
-        });
-      } catch (error) {
-        console.error('❌ Erreur reconnaissance:', error);
-        Alert.alert('Erreur', 'Erreur lors de la reconnaissance vocale.');
-        globalIsListening = false;
-        currentActiveField = null;
-        currentActiveCallback = null;
-        globalUpdateUI?.(); // ✨ MISE À JOUR UI
-      }
-    };
+    const handlePress = useCallback(() => {
+      onStartListening(fieldName, onChangeText);
+    }, [fieldName, onChangeText, onStartListening]);
 
     return (
       <View style={styles.inputContainer}>
@@ -189,7 +76,7 @@ const InputWithMicrophone = React.memo(
               color: colors.text,
               backgroundColor: colors.card,
               borderColor: colors.border,
-              paddingRight: 100, // ✨ Plus d'espace pour le texte "Écoute..."
+              paddingRight: 100,
             },
             style,
           ]}
@@ -206,7 +93,7 @@ const InputWithMicrophone = React.memo(
             alignItems: 'center',
           }}
         >
-          {globalIsListening && currentActiveField === fieldName && (
+          {isListening && isActive && (
             <ThemedText
               style={{
                 color: '#ff4757',
@@ -215,31 +102,25 @@ const InputWithMicrophone = React.memo(
                 fontWeight: '600',
               }}
             >
-              🎤 Écoute...
+              {listeningLabel}
             </ThemedText>
           )}
           <TouchableOpacity
             style={[
-              styles.micButtonInner, // ✨ Nouveau style sans position absolue
+              styles.micButtonInner,
               {
                 backgroundColor:
-                  globalIsListening && currentActiveField === fieldName
-                    ? '#ff4757'
-                    : colors.tint,
+                  isListening && isActive ? '#ff4757' : colors.tint,
                 transform:
-                  globalIsListening && currentActiveField === fieldName
-                    ? [{ scale: 1.1 }]
-                    : [{ scale: 1 }],
+                  isListening && isActive ? [{ scale: 1.1 }] : [{ scale: 1 }],
               },
             ]}
-            onPress={() => startVoiceRecognition(fieldName)}
+            onPress={handlePress}
             activeOpacity={0.7}
           >
             <IconSymbol
               name='mic.fill'
-              size={
-                globalIsListening && currentActiveField === fieldName ? 20 : 18
-              }
+              size={isListening && isActive ? 20 : 18}
               color='#fff'
             />
           </TouchableOpacity>
@@ -249,26 +130,111 @@ const InputWithMicrophone = React.memo(
   }
 );
 
+InputWithMicrophone.displayName = 'InputWithMicrophone';
+
 export default function PromptScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
+  const { t, i18n } = useTranslation();
 
-  // États du formulaire selon project.md
   const [promptName, setPromptName] = useState('');
   const [mainRequest, setMainRequest] = useState('');
   const [role, setRole] = useState('');
   const [context, setContext] = useState('');
   const [exampleStyle, setExampleStyle] = useState('');
   const [responseFormat, setResponseFormat] = useState('');
-  const [selectedTone, setSelectedTone] = useState(TONES[0]);
+  const [selectedTone, setSelectedTone] = useState<ToneKey>('neutral');
   const [loading, setLoading] = useState(false);
   const [showTonePicker, setShowTonePicker] = useState(false);
 
-  // Animation pour swipe down
-  const modalTranslateY = useRef(new Animated.Value(0)).current;
+  const toneOptions = useMemo(
+    () =>
+      TONE_KEYS.map((key) => ({
+        key,
+        label: getToneLabel(key, t),
+      })),
+    [t]
+  );
 
-  // PanResponder pour gérer le swipe down
+  const recognitionLanguage = useMemo(
+    () => (i18n.language.startsWith('en') ? 'en-US' : 'fr-FR'),
+    [i18n.language]
+  );
+
+  const [activeListeningField, setActiveListeningField] = useState<string | null>(
+    null
+  );
+  const [isListening, setIsListening] = useState(false);
+
+  const modalTranslateY = useRef(new Animated.Value(0)).current;
+  const activeFieldRef = useRef<string | null>(null);
+  const activeCallbackRef = useRef<((text: string) => void) | null>(null);
+  const isListeningRef = useRef(false);
+
+  useEffect(() => {
+    activeFieldRef.current = activeListeningField;
+  }, [activeListeningField]);
+
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
+  const resetListeningState = useCallback(() => {
+    activeFieldRef.current = null;
+    activeCallbackRef.current = null;
+    setActiveListeningField(null);
+  }, []);
+
+  useSpeechRecognitionEvent('start', () => {
+    setIsListening(true);
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+    resetListeningState();
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const callback = activeCallbackRef.current;
+    if (callback && event.results && event.results.length > 0) {
+      const spokenText = event.results[0]?.transcript || '';
+      if (spokenText.trim()) {
+        callback(spokenText);
+        Alert.alert(
+          t('screens.prompt.alerts.recognitionTitle'),
+          t('screens.prompt.alerts.recognitionSuccess', { text: spokenText })
+        );
+      }
+    }
+    Promise.resolve(ExpoSpeechRecognitionModule.stop()).catch(() => undefined);
+    setIsListening(false);
+    resetListeningState();
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    Promise.resolve(ExpoSpeechRecognitionModule.stop()).catch(() => undefined);
+    setIsListening(false);
+    resetListeningState();
+    const normalErrors = ['no-speech', 'no-match', 'aborted'];
+    if (!normalErrors.includes(event.error)) {
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.prompt.alerts.recognitionError', { message: event.message })
+      );
+    }
+  });
+
+  useEffect(() => {
+    return () => {
+      if (isListeningRef.current) {
+        Promise.resolve(ExpoSpeechRecognitionModule.stop()).catch(
+          () => undefined
+        );
+      }
+    };
+  }, []);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (evt, gestureState) => {
@@ -287,10 +253,8 @@ export default function PromptScreen() {
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dy > 100) {
-          // Si on glisse plus de 100px vers le bas, on ferme
           closeModalWithAnimation();
         } else {
-          // Sinon on remet en place
           Animated.spring(modalTranslateY, {
             toValue: 0,
             useNativeDriver: true,
@@ -300,7 +264,7 @@ export default function PromptScreen() {
     })
   ).current;
 
-  const closeModalWithAnimation = () => {
+  const closeModalWithAnimation = useCallback(() => {
     Animated.timing(modalTranslateY, {
       toValue: 300,
       duration: 250,
@@ -309,29 +273,74 @@ export default function PromptScreen() {
       setShowTonePicker(false);
       modalTranslateY.setValue(0);
     });
-  };
+  }, [modalTranslateY]);
 
-  // Validation des champs obligatoires
   const validateForm = () => {
     if (!promptName.trim()) {
-      Alert.alert('Erreur', 'Le nom du prompt est obligatoire');
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.prompt.alerts.validationName')
+      );
       return false;
     }
     if (!mainRequest.trim()) {
-      Alert.alert('Erreur', 'La demande principale est obligatoire');
+      Alert.alert(
+        t('common.status.error'),
+        t('screens.prompt.alerts.validationMain')
+      );
       return false;
     }
     return true;
   };
 
-  // Fonction d'envoi selon project.md
+  const startVoiceRecognition = useCallback(
+    async (fieldName: string, callback: (text: string) => void) => {
+      try {
+        if (isListeningRef.current) {
+          await ExpoSpeechRecognitionModule.stop();
+          return;
+        }
+
+        const permissions =
+          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!permissions.granted) {
+          Alert.alert(
+            t('screens.prompt.alerts.permissionTitle'),
+            t('common.messages.microphonePermission')
+          );
+          return;
+        }
+
+        activeFieldRef.current = fieldName;
+        activeCallbackRef.current = callback;
+        setActiveListeningField(fieldName);
+        setIsListening(true);
+
+        await ExpoSpeechRecognitionModule.start({
+          lang: recognitionLanguage,
+          interimResults: false,
+          continuous: false,
+          requiresOnDeviceRecognition: Platform.OS === 'ios',
+        });
+      } catch (error) {
+        console.error('Erreur reconnaissance:', error);
+        Alert.alert(
+          t('common.status.error'),
+          t('screens.prompt.alerts.voiceError')
+        );
+        setIsListening(false);
+        resetListeningState();
+      }
+    },
+    [resetListeningState, recognitionLanguage, t]
+  );
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
     setLoading(true);
 
     try {
-      // Préparer les données pour le service
       const formData: PromptFormData = {
         promptName,
         mainRequest,
@@ -339,33 +348,31 @@ export default function PromptScreen() {
         context,
         exampleStyle,
         responseFormat,
-        selectedTone,
+        selectedTone: getToneLabel(selectedTone, t),
       };
 
-      // Créer et sauvegarder le prompt
       const savedPrompt = await createPrompt(formData);
 
-      // Réinitialiser le formulaire
       setPromptName('');
       setMainRequest('');
       setRole('');
       setContext('');
       setExampleStyle('');
       setResponseFormat('');
-      setSelectedTone(TONES[0]);
+      setSelectedTone('neutral');
 
-      // Navigation vers l'écran "Prompt généré" (après reset du form)
       router.push({
-        pathname: '/generated' as any,
+        pathname: '/generated' as const,
         params: {
           promptId: savedPrompt.id,
-          // Pas de fromHistory = retour au formulaire par défaut
+          source: 'form',
         },
       });
     } catch (error) {
+      console.error('Erreur création prompt:', error);
       Alert.alert(
-        'Erreur',
-        'Une erreur est survenue lors de la création du prompt'
+        t('common.status.error'),
+        t('screens.prompt.alerts.creationError')
       );
     } finally {
       setLoading(false);
@@ -376,103 +383,120 @@ export default function PromptScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      {/* Header */}
       <ThemedView style={styles.header}>
         <ThemedText type='title' style={styles.headerTitle}>
-          Créer un Prompt
+          {t('screens.prompt.title')}
         </ThemedText>
       </ThemedView>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Nom du prompt - OBLIGATOIRE */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Nom du prompt <ThemedText style={{ color: 'red' }}>*</ThemedText>
+            {t('screens.prompt.fields.name')}{' '}
+            <ThemedText style={{ color: 'red' }}>*</ThemedText>
           </ThemedText>
           <InputWithMicrophone
             value={promptName}
             onChangeText={setPromptName}
-            placeholder='Ex: Email de relance client'
+            placeholder={t('screens.prompt.placeholders.name')}
             fieldName='promptName'
+            onStartListening={startVoiceRecognition}
+            isListening={isListening}
+            isActive={activeListeningField === 'promptName'}
+            listeningLabel={t('common.messages.listening')}
           />
         </ThemedView>
 
-        {/* Demande principale - OBLIGATOIRE */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Demande principale{' '}
+            {t('screens.prompt.fields.mainRequest')}{' '}
             <ThemedText style={{ color: 'red' }}>*</ThemedText>
           </ThemedText>
           <InputWithMicrophone
             value={mainRequest}
             onChangeText={setMainRequest}
-            placeholder="Décrivez ce que vous voulez que l'IA génère..."
+            placeholder={t('screens.prompt.placeholders.mainRequest')}
             fieldName='mainRequest'
             multiline
             numberOfLines={4}
+            onStartListening={startVoiceRecognition}
+            isListening={isListening}
+            isActive={activeListeningField === 'mainRequest'}
+            listeningLabel={t('common.messages.listening')}
           />
         </ThemedView>
 
-        {/* Rôle - OPTIONNEL */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Rôle (optionnel)
+            {t('screens.prompt.fields.role')}
           </ThemedText>
           <InputWithMicrophone
             value={role}
             onChangeText={setRole}
-            placeholder='Ex: Tu es un expert en marketing digital'
+            placeholder={t('screens.prompt.placeholders.role')}
             fieldName='role'
+            onStartListening={startVoiceRecognition}
+            isListening={isListening}
+            isActive={activeListeningField === 'role'}
+            listeningLabel={t('common.messages.listening')}
           />
         </ThemedView>
 
-        {/* Contexte - OPTIONNEL */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Contexte (optionnel)
+            {t('screens.prompt.fields.context')}
           </ThemedText>
           <InputWithMicrophone
             value={context}
             onChangeText={setContext}
-            placeholder='Informations de contexte importantes...'
+            placeholder={t('screens.prompt.placeholders.context')}
             fieldName='context'
             multiline
             numberOfLines={3}
+            onStartListening={startVoiceRecognition}
+            isListening={isListening}
+            isActive={activeListeningField === 'context'}
+            listeningLabel={t('common.messages.listening')}
           />
         </ThemedView>
 
-        {/* Exemple/Style - OPTIONNEL */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Exemple/Style (optionnel)
+            {t('screens.prompt.fields.exampleStyle')}
           </ThemedText>
           <InputWithMicrophone
             value={exampleStyle}
             onChangeText={setExampleStyle}
-            placeholder='Exemples de style ou format souhaité...'
+            placeholder={t('screens.prompt.placeholders.exampleStyle')}
             fieldName='exampleStyle'
             multiline
             numberOfLines={3}
+            onStartListening={startVoiceRecognition}
+            isListening={isListening}
+            isActive={activeListeningField === 'exampleStyle'}
+            listeningLabel={t('common.messages.listening')}
           />
         </ThemedView>
 
-        {/* Format de réponse - OPTIONNEL */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Format de réponse (optionnel)
+            {t('screens.prompt.fields.responseFormat')}
           </ThemedText>
           <InputWithMicrophone
             value={responseFormat}
             onChangeText={setResponseFormat}
-            placeholder='Ex: Liste à puces, JSON, paragraphe...'
+            placeholder={t('screens.prompt.placeholders.responseFormat')}
             fieldName='responseFormat'
+            onStartListening={startVoiceRecognition}
+            isListening={isListening}
+            isActive={activeListeningField === 'responseFormat'}
+            listeningLabel={t('common.messages.listening')}
           />
         </ThemedView>
 
-        {/* Ton - PICKER */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            Ton
+            {t('screens.prompt.fields.tone')}
           </ThemedText>
           <TouchableOpacity
             style={[
@@ -485,13 +509,12 @@ export default function PromptScreen() {
             onPress={() => setShowTonePicker(true)}
           >
             <ThemedText style={[styles.dropdownText, { color: colors.text }]}>
-              {selectedTone}
+              {t(`tones.${selectedTone}`)}
             </ThemedText>
             <IconSymbol name='chevron.right' size={16} color={colors.icon} />
           </TouchableOpacity>
         </ThemedView>
 
-        {/* Bouton Envoyer */}
         <TouchableOpacity
           style={[
             styles.submitButton,
@@ -504,12 +527,13 @@ export default function PromptScreen() {
           disabled={loading}
         >
           <ThemedText style={[styles.submitButtonText, { color: '#fff' }]}>
-            {loading ? 'Création en cours...' : 'Envoyer'}
+            {loading
+              ? t('screens.prompt.actions.submitting')
+              : t('screens.prompt.actions.submit')}
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal Picker de Ton */}
       <Modal
         visible={showTonePicker}
         transparent={true}
@@ -525,51 +549,46 @@ export default function PromptScreen() {
             style={[
               styles.modalContent,
               {
-                backgroundColor: colors.background,
+                backgroundColor: colors.card,
                 transform: [{ translateY: modalTranslateY }],
               },
             ]}
             {...panResponder.panHandlers}
           >
-            {/* Header avec poignée */}
-            <ThemedView style={styles.modalHandle}>
-              <ThemedView
-                style={[styles.handle, { backgroundColor: colors.border }]}
+            <View style={styles.modalHandle}>
+              <View
+                style={[styles.handle, { backgroundColor: colors.icon }]}
               />
-            </ThemedView>
-
-            <ThemedView style={styles.modalHeader}>
+            </View>
+            <View style={styles.modalHeader}>
               <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
-                Choisir un ton
+                {t('screens.prompt.selectTone')}
               </ThemedText>
-            </ThemedView>
-
+            </View>
             <FlatList
-              data={TONES}
-              keyExtractor={(item, index) => index.toString()}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={true}
+              data={toneOptions}
+              keyExtractor={(item) => item.key}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.toneItem,
                     {
-                      backgroundColor:
-                        selectedTone === item
-                          ? ((colors as any).accent || colors.tint) + '20' // Version transparente
-                          : 'transparent',
                       borderColor:
-                        selectedTone === item
+                        selectedTone === item.key
                           ? (colors as any).accent || colors.tint
                           : colors.border,
+                      backgroundColor:
+                        selectedTone === item.key
+                          ? ((colors as any).accent || colors.tint) + '10'
+                          : colors.card,
                     },
                   ]}
                   onPress={() => {
-                    setSelectedTone(item);
-                    closeModalWithAnimation();
+                    setSelectedTone(item.key);
+                    setShowTonePicker(false);
                   }}
                 >
-                  {selectedTone === item && (
+                  {selectedTone === item.key && (
                     <ThemedView
                       style={[
                         styles.checkIcon,
@@ -597,14 +616,14 @@ export default function PromptScreen() {
                       styles.toneText,
                       {
                         color:
-                          selectedTone === item
+                          selectedTone === item.key
                             ? (colors as any).accent || colors.tint
                             : colors.text,
-                        fontWeight: selectedTone === item ? '600' : '400',
+                        fontWeight: selectedTone === item.key ? '600' : '400',
                       },
                     ]}
                   >
-                    {item}
+                    {item.label}
                   </ThemedText>
                 </TouchableOpacity>
               )}
@@ -658,21 +677,6 @@ const styles = StyleSheet.create({
   inputContainer: {
     position: 'relative',
   },
-  micButton: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
   micButtonInner: {
     width: 36,
     height: 36,
@@ -707,8 +711,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -774,3 +776,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+
+
+
