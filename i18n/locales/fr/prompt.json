@@ -1,0 +1,35 @@
+{
+  "title": "Créer un prompt",
+  "fields": {
+    "name": "Nom du prompt",
+    "mainRequest": "Demande principale",
+    "role": "Rôle (optionnel)",
+    "context": "Contexte (optionnel)",
+    "exampleStyle": "Exemple/Style (optionnel)",
+    "responseFormat": "Format de réponse (optionnel)",
+    "tone": "Ton"
+  },
+  "placeholders": {
+    "name": "Ex: Email de relance client",
+    "mainRequest": "Décrivez ce que vous voulez que l'IA génère...",
+    "role": "Ex: Tu es un expert en marketing digital",
+    "context": "Informations de contexte importantes...",
+    "exampleStyle": "Exemples de style ou format souhaité...",
+    "responseFormat": "Ex: Liste à puces, JSON, paragraphe..."
+  },
+  "actions": {
+    "submit": "Envoyer",
+    "submitting": "Création en cours..."
+  },
+  "selectTone": "Sélectionner un ton",
+  "alerts": {
+    "recognitionTitle": "Reconnaissance",
+    "recognitionSuccess": "Texte reconnu : \"{{text}}\"",
+    "recognitionError": "Erreur de reconnaissance : {{message}}",
+    "permissionTitle": "Permission requise",
+    "validationName": "Le nom du prompt est obligatoire",
+    "validationMain": "La demande principale est obligatoire",
+    "creationError": "Une erreur est survenue lors de la création.",
+    "voiceError": "Reconnaissance vocale impossible."
+  }
+}

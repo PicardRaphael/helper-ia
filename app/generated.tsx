@@ -2,6 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Image,
@@ -14,18 +15,20 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useEnsureNamespaces } from '@/hooks/useEnsureNamespaces';
 import {
   getPromptById,
+  PromptValidationError,
   SavedPrompt,
   updatePrompt,
 } from '@/services/promptService';
+import { ScreenHeader } from '@/components/screen-header';
 
 // Interface pour les plateformes IA
 interface AIPlatform {
@@ -96,7 +99,8 @@ export default function GeneratedScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
-  const { t } = useTranslation();
+  useEnsureNamespaces('common', 'generated');
+  const { t } = useTranslation(['common', 'generated']);
   const { promptId, source } = useLocalSearchParams<{
     promptId: string;
     source?: 'form' | 'history';
@@ -130,7 +134,7 @@ export default function GeneratedScreen() {
         } else {
           Alert.alert(
             t('common.status.error'),
-            t('screens.generated.empty.notFound')
+            t('generated:empty.notFound')
           );
           router.back();
         }
@@ -139,7 +143,7 @@ export default function GeneratedScreen() {
       console.error('Erreur chargement prompt:', error);
       Alert.alert(
         t('common.status.error'),
-        t('screens.generated.alerts.loadError')
+        t('generated:alerts.loadError')
       );
       router.back();
     } finally {
@@ -155,33 +159,62 @@ export default function GeneratedScreen() {
   const handleSave = async () => {
     if (!prompt) return;
 
+    const trimmedName = editedName.trim();
+    const trimmedPrompt = editedPrompt.trim();
+
+    if (!trimmedName) {
+      Alert.alert(
+        t('common.status.error'),
+        t('generated:alerts.validationName')
+      );
+      return;
+    }
+
+    if (!trimmedPrompt) {
+      Alert.alert(
+        t('common.status.error'),
+        t('generated:alerts.validationPrompt')
+      );
+      return;
+    }
+
     try {
       await updatePrompt(prompt.id, {
-        promptName: editedName.trim(),
-        generatedPrompt: editedPrompt,
+        promptName: trimmedName,
+        generatedPrompt: trimmedPrompt,
       });
 
       setPrompt((prev) =>
         prev
           ? {
               ...prev,
-              name: editedName.trim(),
-              generatedPrompt: editedPrompt,
+              name: trimmedName,
+              generatedPrompt: trimmedPrompt,
               updatedAt: new Date(),
             }
           : null
       );
+      setEditedName(trimmedName);
+      setEditedPrompt(trimmedPrompt);
       setHasChanges(false);
 
       Alert.alert(
         t('common.status.success'),
-        t('screens.generated.alerts.saveSuccess')
+        t('generated:alerts.saveSuccess')
       );
     } catch (error) {
       console.error('Erreur sauvegarde prompt:', error);
+      if (error instanceof PromptValidationError) {
+        const messageKey =
+          error.code === 'promptNameRequired'
+            ? 'generated:alerts.validationName'
+            : 'generated:alerts.validationPrompt';
+        Alert.alert(t('common.status.error'), t(messageKey));
+        return;
+      }
       Alert.alert(
         t('common.status.error'),
-        t('screens.generated.alerts.saveError')
+        t('generated:alerts.saveError')
       );
     }
   };
@@ -191,13 +224,13 @@ export default function GeneratedScreen() {
       await Clipboard.setStringAsync(editedPrompt);
       Alert.alert(
         t('common.status.success'),
-        t('screens.generated.alerts.copySuccess')
+        t('generated:alerts.copySuccess')
       );
     } catch (error) {
       console.error('Erreur copie prompt:', error);
       Alert.alert(
         t('common.status.error'),
-        t('screens.generated.alerts.copyError')
+        t('generated:alerts.copyError')
       );
     }
   };
@@ -276,10 +309,10 @@ export default function GeneratedScreen() {
       const storeUrl = isIOS ? platform.iosStore : platform.androidStore;
       if (storeUrl) {
         Alert.alert(
-          t('screens.generated.alerts.platformNotInstalledTitle', {
+          t('generated:alerts.platformNotInstalledTitle', {
             platform: platform.name,
           }),
-          t('screens.generated.alerts.platformNotInstalledMessage', {
+          t('generated:alerts.platformNotInstalledMessage', {
             platform: platform.name,
           }),
           [
@@ -296,7 +329,7 @@ export default function GeneratedScreen() {
                   console.log(storeError);
                   Alert.alert(
                     t('common.status.error'),
-                    t('screens.generated.alerts.platformStoreError')
+                    t('generated:alerts.platformStoreError')
                   );
                 }
               },
@@ -305,8 +338,8 @@ export default function GeneratedScreen() {
         );
       } else {
         Alert.alert(
-          t('screens.generated.alerts.platformNotAvailableTitle'),
-          t('screens.generated.alerts.platformNotAvailableMessage', {
+          t('generated:alerts.platformNotAvailableTitle'),
+          t('generated:alerts.platformNotAvailableMessage', {
             platform: platform.name,
           })
         );
@@ -315,7 +348,7 @@ export default function GeneratedScreen() {
       console.error('💥 ERREUR APP:', error);
       Alert.alert(
         t('common.status.error'),
-        t('screens.generated.alerts.platformOpenError', {
+        t('generated:alerts.platformOpenError', {
           platform: platform.name,
         })
       );
@@ -334,7 +367,7 @@ export default function GeneratedScreen() {
       console.error('💥 ERREUR WEB:', error);
       Alert.alert(
         t('common.status.error'),
-        t('screens.generated.alerts.webOpenError', { platform: platform.name })
+        t('generated:alerts.webOpenError', { platform: platform.name })
       );
     }
   };
@@ -342,17 +375,17 @@ export default function GeneratedScreen() {
   const handleBack = () => {
     if (hasChanges) {
       Alert.alert(
-        t('screens.generated.alerts.unsavedTitle'),
-        t('screens.generated.alerts.unsavedMessage'),
+        t('generated:alerts.unsavedTitle'),
+        t('generated:alerts.unsavedMessage'),
         [
           {
-            text: t('screens.generated.alerts.unsavedDiscard'),
+            text: t('generated:alerts.unsavedDiscard'),
             onPress: () => router.back(),
             style: 'destructive',
           },
           { text: t('common.actions.cancel'), style: 'cancel' },
           {
-            text: t('screens.generated.alerts.unsavedSave'),
+            text: t('generated:alerts.unsavedSave'),
             onPress: async () => {
               await handleSave();
               router.back();
@@ -377,7 +410,7 @@ export default function GeneratedScreen() {
       >
         <ThemedView style={styles.loadingContainer}>
           <ThemedText style={{ color: colors.text }}>
-            {t('screens.generated.empty.loading')}
+            {t('generated:empty.loading')}
           </ThemedText>
         </ThemedView>
       </SafeAreaView>
@@ -391,7 +424,7 @@ export default function GeneratedScreen() {
       >
         <ThemedView style={styles.loadingContainer}>
           <ThemedText style={{ color: colors.text }}>
-            {t('screens.generated.empty.notFound')}
+            {t('generated:empty.notFound')}
           </ThemedText>
         </ThemedView>
       </SafeAreaView>
@@ -403,21 +436,18 @@ export default function GeneratedScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* Header */}
-      <ThemedView style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <IconSymbol name='chevron.left' size={24} color={colors.text} />
-        </TouchableOpacity>
-        <ThemedText type='title' style={styles.headerTitle}>
-          {t('screens.generated.title')}
-        </ThemedText>
-        <ThemedView style={styles.headerSpacer} />
-      </ThemedView>
+      <ScreenHeader
+        title={t('generated:title')}
+        showBackButton
+        onBack={handleBack}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Nom du prompt */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.generated.fields.nameLabel')}
+            {t('generated:fields.nameLabel')}{' '}
+            <ThemedText style={{ color: 'red' }}>*</ThemedText>
           </ThemedText>
           <TextInput
             style={[
@@ -430,7 +460,7 @@ export default function GeneratedScreen() {
             ]}
             value={editedName}
             onChangeText={setEditedName}
-            placeholder={t('screens.generated.fields.namePlaceholder')}
+            placeholder={t('generated:fields.namePlaceholder')}
             placeholderTextColor={colors.icon}
           />
         </ThemedView>
@@ -438,7 +468,8 @@ export default function GeneratedScreen() {
         {/* Prompt généré */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.generated.fields.promptLabel')}
+            {t('generated:fields.promptLabel')}{' '}
+            <ThemedText style={{ color: 'red' }}>*</ThemedText>
           </ThemedText>
           <TextInput
             style={[
@@ -454,7 +485,7 @@ export default function GeneratedScreen() {
             multiline
             numberOfLines={12}
             textAlignVertical='top'
-            placeholder={t('screens.generated.fields.promptPlaceholder')}
+            placeholder={t('generated:fields.promptPlaceholder')}
             placeholderTextColor={colors.icon}
           />
         </ThemedView>
@@ -469,7 +500,7 @@ export default function GeneratedScreen() {
             onPress={handleSave}
           >
             <ThemedText style={[styles.saveButtonText, { color: '#000' }]}>
-              {t('screens.generated.actions.saveChanges')}
+              {t('generated:actions.saveChanges')}
             </ThemedText>
           </TouchableOpacity>
         )}
@@ -484,14 +515,14 @@ export default function GeneratedScreen() {
         >
           <IconSymbol name='doc.text' size={20} color={colors.text} />
           <ThemedText style={[styles.copyButtonText, { color: colors.text }]}>
-            {t('screens.generated.actions.copyPrompt')}
+            {t('generated:actions.copyPrompt')}
           </ThemedText>
         </TouchableOpacity>
 
         {/* Sélection plateforme IA */}
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.generated.actions.openIn')}
+            {t('generated:actions.openIn')}
           </ThemedText>
           <ThemedView style={styles.platformContainer}>
             {AI_PLATFORMS.map((platform) => (
@@ -552,7 +583,7 @@ export default function GeneratedScreen() {
                 resizeMode='contain'
               />
               <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
-                {t('screens.generated.actions.goTo', {
+                {t('generated:actions.goTo', {
                   name: selectedPlatform.name,
                 })}
               </ThemedText>
@@ -560,7 +591,7 @@ export default function GeneratedScreen() {
           ) : (
             <ThemedText style={[styles.goButtonText, { color: '#fff' }]}>
               {selectedPlatform.icon}{' '}
-              {t('screens.generated.actions.goTo', {
+              {t('generated:actions.goTo', {
                 name: selectedPlatform.name,
               })}
             </ThemedText>
@@ -581,7 +612,7 @@ export default function GeneratedScreen() {
               {/* Header */}
               <ThemedView style={styles.modalHeader}>
                 <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
-                  {t('screens.generated.actions.goTo', {
+                  {t('generated:actions.goTo', {
                     name: selectedPlatform.name,
                   })}
                 </ThemedText>
@@ -607,12 +638,12 @@ export default function GeneratedScreen() {
                   <ThemedText
                     style={[styles.modalButtonText, { color: '#fff' }]}
                   >
-                    {t('screens.generated.actions.appButton')}
+                    {t('generated:actions.appButton')}
                   </ThemedText>
                   <ThemedText
                     style={[styles.modalButtonSubtext, { color: '#fff' }]}
                   >
-                    {t('screens.generated.actions.appSubtitle')}
+                    {t('generated:actions.appSubtitle')}
                   </ThemedText>
                 </TouchableOpacity>
 
@@ -631,12 +662,12 @@ export default function GeneratedScreen() {
                       { color: selectedPlatform.color || '#6366f1' },
                     ]}
                   >
-                    {t('screens.generated.actions.webButton')}
+                    {t('generated:actions.webButton')}
                   </ThemedText>
                   <ThemedText
                     style={[styles.modalButtonSubtext, { color: colors.text }]}
                   >
-                    {t('screens.generated.actions.webSubtitle')}
+                    {t('generated:actions.webSubtitle')}
                   </ThemedText>
                 </TouchableOpacity>
               </ThemedView>
@@ -649,7 +680,7 @@ export default function GeneratedScreen() {
                 <ThemedText
                   style={[styles.modalCancelText, { color: colors.text }]}
                 >
-                  {t('screens.generated.actions.cancel')}
+                  {t('generated:actions.cancel')}
                 </ThemedText>
               </TouchableOpacity>
             </ThemedView>
@@ -668,26 +699,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 20,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
   },
   content: {
     flex: 1,

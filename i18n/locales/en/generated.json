@@ -1,0 +1,44 @@
+{
+  "title": "Generated prompt",
+  "fields": {
+    "nameLabel": "Prompt name",
+    "namePlaceholder": "Prompt name",
+    "promptLabel": "Generated prompt",
+    "promptPlaceholder": "Prompt content..."
+  },
+  "actions": {
+    "saveChanges": "Save changes",
+    "copyPrompt": "Copy prompt",
+    "openIn": "📱 Open in:",
+    "goTo": "Open {{name}}",
+    "appButton": "📱 App",
+    "appSubtitle": "Open the native app",
+    "webButton": "🌐 Browser",
+    "webSubtitle": "Open in the browser",
+    "cancel": "Cancel"
+  },
+  "alerts": {
+    "saveSuccess": "Prompt saved successfully",
+    "saveError": "Unable to save your changes",
+    "validationName": "Prompt name cannot be empty",
+    "validationPrompt": "Generated prompt cannot be empty",
+    "copySuccess": "Prompt copied to clipboard",
+    "copyError": "Unable to copy the prompt",
+    "unsavedTitle": "Unsaved changes",
+    "unsavedMessage": "Do you want to save your changes before leaving?",
+    "unsavedDiscard": "Leave without saving",
+    "unsavedSave": "Save",
+    "platformNotInstalledTitle": "{{platform}} not installed",
+    "platformNotInstalledMessage": "{{platform}} is not installed. Would you like to install it?",
+    "platformNotAvailableTitle": "App unavailable",
+    "platformNotAvailableMessage": "{{platform}} is not available on this platform.",
+    "platformStoreError": "Unable to open the store",
+    "platformOpenError": "Unable to open the {{platform}} app",
+    "webOpenError": "Unable to open {{platform}} in the browser",
+    "loadError": "Unable to load the prompt"
+  },
+  "empty": {
+    "loading": "Loading...",
+    "notFound": "Prompt not found"
+  }
+}

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import {
   Alert,
@@ -13,20 +14,23 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { ScreenHeader } from '@/components/screen-header';
 import {
   LanguagePreference,
   ThemePreference,
   useSettingsStore,
 } from '@/stores/settingsStore';
 import { supportedLanguages } from '@/i18n';
+import { useEnsureNamespaces } from '@/hooks/useEnsureNamespaces';
 
 export default function ParametresScreen() {
+  const router = useRouter();
   const theme = useSettingsStore((state) => state.theme);
   const language = useSettingsStore((state) => state.language);
   const setTheme = useSettingsStore((state) => state.setTheme);
   const setLanguage = useSettingsStore((state) => state.setLanguage);
-  const { t } = useTranslation();
+  useEnsureNamespaces('common', 'settings');
+  const { t } = useTranslation(['common', 'settings']);
 
   const themeOptions: { label: string; value: ThemePreference }[] = useMemo(
     () => [
@@ -56,7 +60,7 @@ export default function ParametresScreen() {
       await Linking.openURL(storeUrl);
     } catch (error) {
       console.error('Erreur ouverture page notation:', error);
-      Alert.alert(t('common.status.error'), t('screens.settings.alerts.openStoreError'));
+      Alert.alert(t('common.status.error'), t('settings:alerts.openStoreError'));
     }
   };
 
@@ -65,17 +69,12 @@ export default function ParametresScreen() {
       await Linking.openURL(t('links.contactEmail'));
     } catch (error) {
       console.error('Erreur ouverture mail:', error);
-      Alert.alert(t('common.status.error'), t('screens.settings.alerts.openMailError'));
+      Alert.alert(t('common.status.error'), t('settings:alerts.openMailError'));
     }
   };
 
-  const handleLegal = async () => {
-    try {
-      await Linking.openURL(t('links.privacyPolicy'));
-    } catch (error) {
-      console.error('Erreur ouverture page légale:', error);
-      Alert.alert(t('common.status.error'), t('screens.settings.alerts.openError'));
-    }
+  const handleLegal = () => {
+    router.push('/legal');
   };
 
   return (
@@ -90,22 +89,13 @@ export default function ParametresScreen() {
         />
       }
     >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type='title'
-          style={{
-            fontFamily: Fonts.rounded,
-          }}
-        >
-          {t('screens.settings.title')}
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>
-        {t('screens.settings.subtitle')}
-      </ThemedText>
+      <ScreenHeader
+        title={t('settings:title')}
+        subtitle={t('settings:subtitle')}
+      />
 
       <ThemedView style={styles.section}>
-        <ThemedText type='subtitle'>{t('screens.settings.languageLabel')}</ThemedText>
+        <ThemedText type='subtitle'>{t('settings:languageLabel')}</ThemedText>
         <View style={styles.pillGroup}>
           {languageOptions.map((option) => (
             <TouchableOpacity
@@ -128,12 +118,12 @@ export default function ParametresScreen() {
           ))}
         </View>
         <ThemedText style={styles.helperText}>
-          {t('screens.settings.languageHelper')}
+          {t('settings:languageHelper')}
         </ThemedText>
       </ThemedView>
 
       <ThemedView style={styles.section}>
-        <ThemedText type='subtitle'>{t('screens.settings.themeLabel')}</ThemedText>
+        <ThemedText type='subtitle'>{t('settings:themeLabel')}</ThemedText>
         <View style={styles.pillGroup}>
           {themeOptions.map((option) => (
             <TouchableOpacity
@@ -153,36 +143,36 @@ export default function ParametresScreen() {
           ))}
         </View>
         <ThemedText style={styles.helperText}>
-          {t('screens.settings.themeHelper')}
+          {t('settings:themeHelper')}
         </ThemedText>
       </ThemedView>
 
       <ThemedView style={styles.section}>
-        <ThemedText type='subtitle'>{t('screens.settings.reviewLabel')}</ThemedText>
+        <ThemedText type='subtitle'>{t('settings:reviewLabel')}</ThemedText>
         <TouchableOpacity style={styles.row} onPress={handleRateApp}>
           <IconSymbol name='star.fill' size={20} color='#facc15' />
           <ThemedText style={styles.rowText}>
-            {t('screens.settings.reviewDescription')}
+            {t('settings:reviewDescription')}
           </ThemedText>
         </TouchableOpacity>
       </ThemedView>
 
       <ThemedView style={styles.section}>
-        <ThemedText type='subtitle'>{t('screens.settings.contactLabel')}</ThemedText>
+        <ThemedText type='subtitle'>{t('settings:contactLabel')}</ThemedText>
         <TouchableOpacity style={styles.row} onPress={handleContact}>
           <IconSymbol name='envelope' size={20} color='#6366f1' />
           <ThemedText style={styles.rowText}>
-            {t('screens.settings.contactDescription')}
+            {t('settings:contactDescription')}
           </ThemedText>
         </TouchableOpacity>
       </ThemedView>
 
       <ThemedView style={styles.section}>
-        <ThemedText type='subtitle'>{t('screens.settings.legalLabel')}</ThemedText>
+        <ThemedText type='subtitle'>{t('settings:legalLabel')}</ThemedText>
         <TouchableOpacity style={styles.row} onPress={handleLegal}>
           <IconSymbol name='doc.text' size={20} color='#6366f1' />
           <ThemedText style={styles.rowText}>
-            {t('screens.settings.legalDescription')}
+            {t('settings:legalDescription')}
           </ThemedText>
         </TouchableOpacity>
       </ThemedView>
@@ -196,10 +186,6 @@ const styles = StyleSheet.create({
     bottom: -90,
     left: -35,
     position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
   },
   section: {
     gap: 12,

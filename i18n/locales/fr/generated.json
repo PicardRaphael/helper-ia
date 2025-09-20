@@ -1,0 +1,44 @@
+{
+  "title": "Prompt généré",
+  "fields": {
+    "nameLabel": "Nom du prompt :",
+    "namePlaceholder": "Nom du prompt",
+    "promptLabel": "Prompt généré :",
+    "promptPlaceholder": "Contenu du prompt..."
+  },
+  "actions": {
+    "saveChanges": "Enregistrer les modifications",
+    "copyPrompt": "Copier le prompt",
+    "openIn": "📱 Ouvrir dans :",
+    "goTo": "Ouvrir {{name}}",
+    "appButton": "📱 Application",
+    "appSubtitle": "Ouvrir l'app native",
+    "webButton": "🌐 Navigateur",
+    "webSubtitle": "Ouvrir dans le navigateur",
+    "cancel": "Annuler"
+  },
+  "alerts": {
+    "saveSuccess": "Prompt sauvegardé avec succès",
+    "saveError": "Impossible de sauvegarder les modifications",
+    "validationName": "Le nom du prompt ne peut pas être vide",
+    "validationPrompt": "Le contenu généré ne peut pas être vide",
+    "copySuccess": "Le prompt a été copié dans le presse-papiers",
+    "copyError": "Impossible de copier le prompt",
+    "unsavedTitle": "Modifications non sauvegardées",
+    "unsavedMessage": "Voulez-vous sauvegarder vos modifications avant de quitter ?",
+    "unsavedDiscard": "Quitter sans sauvegarder",
+    "unsavedSave": "Sauvegarder",
+    "platformNotInstalledTitle": "{{platform}} pas installé",
+    "platformNotInstalledMessage": "L'app {{platform}} n'est pas installée. Voulez-vous l'installer ?",
+    "platformNotAvailableTitle": "App non disponible",
+    "platformNotAvailableMessage": "L'app {{platform}} n'est pas disponible sur cette plateforme.",
+    "platformStoreError": "Impossible d'ouvrir le store",
+    "platformOpenError": "Impossible d'ouvrir l'app {{platform}}",
+    "webOpenError": "Impossible d'ouvrir {{platform}} dans le navigateur",
+    "loadError": "Impossible de charger le prompt"
+  },
+  "empty": {
+    "loading": "Chargement...",
+    "notFound": "Prompt non trouvé"
+  }
+}

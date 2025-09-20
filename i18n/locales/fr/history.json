@@ -1,0 +1,13 @@
+{
+  "title": "Historique",
+  "subtitle": "{{count}} prompt sauvegardé",
+  "subtitle_plural": "{{count}} prompts sauvegardés",
+  "emptyTitle": "Aucun prompt sauvegardé",
+  "emptyDescription": "Créez votre premier prompt pour le voir apparaître ici",
+  "deleteTitle": "Supprimer le prompt",
+  "deleteMessage": "Voulez-vous vraiment supprimer « {{name}} » ?",
+  "errors": {
+    "load": "Erreur lors du chargement des prompts.",
+    "delete": "Impossible de supprimer le prompt"
+  }
+}

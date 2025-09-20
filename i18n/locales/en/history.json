@@ -1,0 +1,13 @@
+{
+  "title": "History",
+  "subtitle": "{{count}} saved prompt",
+  "subtitle_plural": "{{count}} saved prompts",
+  "emptyTitle": "No saved prompts",
+  "emptyDescription": "Create your first prompt to see it listed here",
+  "deleteTitle": "Delete prompt",
+  "deleteMessage": "Do you really want to delete “{{name}}”?",
+  "errors": {
+    "load": "Failed to load prompts.",
+    "delete": "Unable to delete the prompt"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "title": "Create a prompt",
+  "fields": {
+    "name": "Prompt name",
+    "mainRequest": "Main request",
+    "role": "Role (optional)",
+    "context": "Context (optional)",
+    "exampleStyle": "Example/Style (optional)",
+    "responseFormat": "Response format (optional)",
+    "tone": "Tone"
+  },
+  "placeholders": {
+    "name": "Eg: Follow-up email to a client",
+    "mainRequest": "Describe what you want the AI to generate...",
+    "role": "Eg: You are a digital marketing expert",
+    "context": "Important background information...",
+    "exampleStyle": "Desired examples or style...",
+    "responseFormat": "Eg: Bullet list, JSON, paragraph..."
+  },
+  "actions": {
+    "submit": "Submit",
+    "submitting": "Creating..."
+  },
+  "selectTone": "Select a tone",
+  "alerts": {
+    "recognitionTitle": "Recognition",
+    "recognitionSuccess": "Recognized text: \"{{text}}\"",
+    "recognitionError": "Recognition error: {{message}}",
+    "permissionTitle": "Permission required",
+    "validationName": "The prompt name is required",
+    "validationMain": "The main request is required",
+    "creationError": "An error occurred while creating the prompt.",
+    "voiceError": "Voice recognition is unavailable."
+  }
+}

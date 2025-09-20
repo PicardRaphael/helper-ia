@@ -16,11 +16,13 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { getToneLabel, resolveToneKey } from '@/constants/tones';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useEnsureNamespaces } from '@/hooks/useEnsureNamespaces';
 import {
   deletePrompt,
   getAllPrompts,
   SavedPrompt,
 } from '@/services/promptService';
+import { ScreenHeader } from '@/components/screen-header';
 
 function PromptCard({
   prompt,
@@ -33,7 +35,7 @@ function PromptCard({
   onDelete: () => void;
   colors: any;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t, i18n } = useTranslation(['common', 'history']);
   const truncatedRequest =
     prompt.mainRequest.length > 80
       ? prompt.mainRequest.substring(0, 80) + '...'
@@ -94,7 +96,8 @@ export default function HistoriqueScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
-  const { t } = useTranslation();
+  useEnsureNamespaces('common', 'history');
+  const { t } = useTranslation(['common', 'history']);
 
   const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,7 +113,7 @@ export default function HistoriqueScreen() {
       setPrompts(sortedPrompts);
     } catch (error) {
       console.error('Erreur lors du chargement des prompts:', error);
-      Alert.alert(t('common.status.error'), t('screens.history.errors.load'));
+      Alert.alert(t('common.status.error'), t('history:errors.load'));
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -139,8 +142,8 @@ export default function HistoriqueScreen() {
   const handleDeletePrompt = useCallback(
     (prompt: SavedPrompt) => {
       Alert.alert(
-        t('screens.history.deleteTitle'),
-        t('screens.history.deleteMessage', { name: prompt.name }),
+        t('history:deleteTitle'),
+        t('history:deleteMessage', { name: prompt.name }),
         [
           {
             text: t('common.actions.cancel'),
@@ -159,7 +162,7 @@ export default function HistoriqueScreen() {
                 console.error('Erreur lors de la suppression:', error);
                 Alert.alert(
                   t('common.status.error'),
-                  t('screens.history.errors.delete')
+                  t('history:errors.delete')
                 );
               }
             },
@@ -179,10 +182,10 @@ export default function HistoriqueScreen() {
         style={styles.emptyIcon}
       />
       <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
-        {t('screens.history.emptyTitle')}
+        {t('history:emptyTitle')}
       </ThemedText>
       <ThemedText style={[styles.emptyDescription, { color: colors.icon }]}>
-        {t('screens.history.emptyDescription')}
+        {t('history:emptyDescription')}
       </ThemedText>
       <TouchableOpacity
         style={[styles.createButton, { backgroundColor: colors.tint }]}
@@ -199,14 +202,10 @@ export default function HistoriqueScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <View style={styles.header}>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-          {t('screens.history.title')}
-        </ThemedText>
-        <ThemedText style={[styles.headerSubtitle, { color: colors.icon }]}>
-          {t('screens.history.subtitle', { count: prompts.length })}
-        </ThemedText>
-      </View>
+      <ScreenHeader
+        title={t('history:title')}
+        subtitle={t('history:subtitle', { count: prompts.length })}
+      />
 
       <FlatList
         data={prompts}
@@ -241,19 +240,6 @@ export default function HistoriqueScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
   },
   listContainer: {
     paddingHorizontal: 20,

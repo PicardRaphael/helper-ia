@@ -12,4 +12,8 @@
 ## Points à corriger en priorité
 
 - Les prompts déjà enregistrés conservent la valeur de ton d'origine ; le mapping `resolveToneKey` couvre FR/EN mais une migration côté stockage serait nécessaire si d'autres langues sont ajoutées.
-- Les traductions sont chargées en mémoire (non lazy) ; à surveiller si d'autres langues ou namespaces sont introduits (chargement différé conseillé pour limiter le bundle).
+- Les traductions sont chargées en mémoire (non lazy) ; mettre en place un chargement différé pour que chaque écran n'importe que les namespaces dont il a besoin :
+  - convertir `i18n/resources.ts` en simple registre de loaders dynamiques (`const translationLoaders = { fr: () => import('./locales/fr/common.json'), ... }`) et supprimer l'import direct des JSON dans le bundle initial ;
+  - initialiser `i18n` sans `resources` statiques, ajouter un helper `ensureNamespacesLoaded(namespaces)` qui fait `await Promise.all(namespaces.map((ns) => translationLoaders[lng]?.().then((module) => i18n.addResources(lng, ns, module.default))))` avant d'afficher l'écran ;
+  - dans le layout racine (`app/_layout.tsx`), attendre `ensureNamespacesLoaded(['common'])` via le splash Expo pour éviter le clignotement, et déclencher les autres `ensureNamespacesLoaded` dans le `useEffect` de chaque écran lorsque l'utilisateur arrive sur l'onglet concerné ;
+  - activer `useSuspense: false` dans `useTranslation` tant que la promesse est manuelle, puis mesurer le bundle Android/iOS pour s'assurer que la baisse est effective.

@@ -16,13 +16,15 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { TONE_KEYS, type ToneKey, getToneLabel } from '@/constants/tones';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useEnsureNamespaces } from '@/hooks/useEnsureNamespaces';
 import { createPrompt, PromptFormData } from '@/services/promptService';
+import { ScreenHeader } from '@/components/screen-header';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -136,7 +138,8 @@ export default function PromptScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
-  const { t, i18n } = useTranslation();
+  useEnsureNamespaces('common', 'prompt');
+  const { t, i18n } = useTranslation(['common', 'prompt']);
 
   const [promptName, setPromptName] = useState('');
   const [mainRequest, setMainRequest] = useState('');
@@ -202,8 +205,8 @@ export default function PromptScreen() {
       if (spokenText.trim()) {
         callback(spokenText);
         Alert.alert(
-          t('screens.prompt.alerts.recognitionTitle'),
-          t('screens.prompt.alerts.recognitionSuccess', { text: spokenText })
+          t('prompt:alerts.recognitionTitle'),
+          t('prompt:alerts.recognitionSuccess', { text: spokenText })
         );
       }
     }
@@ -220,7 +223,7 @@ export default function PromptScreen() {
     if (!normalErrors.includes(event.error)) {
       Alert.alert(
         t('common.status.error'),
-        t('screens.prompt.alerts.recognitionError', { message: event.message })
+        t('prompt:alerts.recognitionError', { message: event.message })
       );
     }
   });
@@ -279,14 +282,14 @@ export default function PromptScreen() {
     if (!promptName.trim()) {
       Alert.alert(
         t('common.status.error'),
-        t('screens.prompt.alerts.validationName')
+        t('prompt:alerts.validationName')
       );
       return false;
     }
     if (!mainRequest.trim()) {
       Alert.alert(
         t('common.status.error'),
-        t('screens.prompt.alerts.validationMain')
+        t('prompt:alerts.validationMain')
       );
       return false;
     }
@@ -305,7 +308,7 @@ export default function PromptScreen() {
           await ExpoSpeechRecognitionModule.requestPermissionsAsync();
         if (!permissions.granted) {
           Alert.alert(
-            t('screens.prompt.alerts.permissionTitle'),
+            t('prompt:alerts.permissionTitle'),
             t('common.messages.microphonePermission')
           );
           return;
@@ -326,7 +329,7 @@ export default function PromptScreen() {
         console.error('Erreur reconnaissance:', error);
         Alert.alert(
           t('common.status.error'),
-          t('screens.prompt.alerts.voiceError')
+          t('prompt:alerts.voiceError')
         );
         setIsListening(false);
         resetListeningState();
@@ -372,7 +375,7 @@ export default function PromptScreen() {
       console.error('Erreur création prompt:', error);
       Alert.alert(
         t('common.status.error'),
-        t('screens.prompt.alerts.creationError')
+        t('prompt:alerts.creationError')
       );
     } finally {
       setLoading(false);
@@ -383,22 +386,18 @@ export default function PromptScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <ThemedView style={styles.header}>
-        <ThemedText type='title' style={styles.headerTitle}>
-          {t('screens.prompt.title')}
-        </ThemedText>
-      </ThemedView>
+      <ScreenHeader title={t('prompt:title')} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.name')}{' '}
+            {t('prompt:fields.name')}{' '}
             <ThemedText style={{ color: 'red' }}>*</ThemedText>
           </ThemedText>
           <InputWithMicrophone
             value={promptName}
             onChangeText={setPromptName}
-            placeholder={t('screens.prompt.placeholders.name')}
+            placeholder={t('prompt:placeholders.name')}
             fieldName='promptName'
             onStartListening={startVoiceRecognition}
             isListening={isListening}
@@ -409,13 +408,13 @@ export default function PromptScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.mainRequest')}{' '}
+            {t('prompt:fields.mainRequest')}{' '}
             <ThemedText style={{ color: 'red' }}>*</ThemedText>
           </ThemedText>
           <InputWithMicrophone
             value={mainRequest}
             onChangeText={setMainRequest}
-            placeholder={t('screens.prompt.placeholders.mainRequest')}
+            placeholder={t('prompt:placeholders.mainRequest')}
             fieldName='mainRequest'
             multiline
             numberOfLines={4}
@@ -428,12 +427,12 @@ export default function PromptScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.role')}
+            {t('prompt:fields.role')}
           </ThemedText>
           <InputWithMicrophone
             value={role}
             onChangeText={setRole}
-            placeholder={t('screens.prompt.placeholders.role')}
+            placeholder={t('prompt:placeholders.role')}
             fieldName='role'
             onStartListening={startVoiceRecognition}
             isListening={isListening}
@@ -444,12 +443,12 @@ export default function PromptScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.context')}
+            {t('prompt:fields.context')}
           </ThemedText>
           <InputWithMicrophone
             value={context}
             onChangeText={setContext}
-            placeholder={t('screens.prompt.placeholders.context')}
+            placeholder={t('prompt:placeholders.context')}
             fieldName='context'
             multiline
             numberOfLines={3}
@@ -462,12 +461,12 @@ export default function PromptScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.exampleStyle')}
+            {t('prompt:fields.exampleStyle')}
           </ThemedText>
           <InputWithMicrophone
             value={exampleStyle}
             onChangeText={setExampleStyle}
-            placeholder={t('screens.prompt.placeholders.exampleStyle')}
+            placeholder={t('prompt:placeholders.exampleStyle')}
             fieldName='exampleStyle'
             multiline
             numberOfLines={3}
@@ -480,12 +479,12 @@ export default function PromptScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.responseFormat')}
+            {t('prompt:fields.responseFormat')}
           </ThemedText>
           <InputWithMicrophone
             value={responseFormat}
             onChangeText={setResponseFormat}
-            placeholder={t('screens.prompt.placeholders.responseFormat')}
+            placeholder={t('prompt:placeholders.responseFormat')}
             fieldName='responseFormat'
             onStartListening={startVoiceRecognition}
             isListening={isListening}
@@ -496,7 +495,7 @@ export default function PromptScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('screens.prompt.fields.tone')}
+            {t('prompt:fields.tone')}
           </ThemedText>
           <TouchableOpacity
             style={[
@@ -528,8 +527,8 @@ export default function PromptScreen() {
         >
           <ThemedText style={[styles.submitButtonText, { color: '#fff' }]}>
             {loading
-              ? t('screens.prompt.actions.submitting')
-              : t('screens.prompt.actions.submit')}
+              ? t('prompt:actions.submitting')
+              : t('prompt:actions.submit')}
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>
@@ -562,7 +561,7 @@ export default function PromptScreen() {
             </View>
             <View style={styles.modalHeader}>
               <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
-                {t('screens.prompt.selectTone')}
+                {t('prompt:selectTone')}
               </ThemedText>
             </View>
             <FlatList
@@ -638,15 +637,6 @@ export default function PromptScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
   },
   content: {
     flex: 1,

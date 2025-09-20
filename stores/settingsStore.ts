@@ -26,7 +26,9 @@ export const useSettingsStore = create<SettingsState>()(
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => {
         if (i18n.language !== language) {
-          initializeI18n(language);
+          void initializeI18n(language).catch((error) => {
+            console.error('settingsStore: language change failed', error);
+          });
         }
         set({ language });
       },
@@ -36,7 +38,9 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         const language = state?.language ?? getBestLanguage();
-        initializeI18n(language);
+        void initializeI18n(language).catch((error) => {
+          console.error('settingsStore: rehydrate failed', error);
+        });
       },
     }
   )

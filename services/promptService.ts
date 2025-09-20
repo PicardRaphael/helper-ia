@@ -3,6 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/i18n';
 import { getToneLabel, resolveToneKey } from '@/constants/tones';
 
+export class PromptValidationError extends Error {
+  constructor(public code: 'promptNameRequired' | 'generatedPromptRequired') {
+    super(code);
+    this.name = 'PromptValidationError';
+  }
+}
+
 // Interface pour un prompt sauvegardé
 export interface SavedPrompt {
   id: string;
@@ -161,7 +168,7 @@ export const updatePrompt = async (
 
     const existingPrompt = prompts[promptIndex];
 
-    const mergedName = updates.promptName?.trim() ?? existingPrompt.name;
+    const mergedName = (updates.promptName ?? existingPrompt.name).trim();
     const mergedMainRequest = updates.mainRequest?.trim() ?? existingPrompt.mainRequest;
     const mergedRoleRaw = updates.role ?? existingPrompt.role ?? '';
     const mergedContextRaw = updates.context ?? existingPrompt.context ?? '';
@@ -185,10 +192,18 @@ export const updatePrompt = async (
       selectedTone: toneLabelForPrompt,
     };
 
+    if (!mergedName) {
+      throw new PromptValidationError('promptNameRequired');
+    }
+
     const mergedGeneratedPrompt =
       updates.generatedPrompt !== undefined
         ? updates.generatedPrompt.trim()
         : generateFormattedPrompt(mergedData);
+
+    if (!mergedGeneratedPrompt) {
+      throw new PromptValidationError('generatedPromptRequired');
+    }
 
     const updatedPrompt: SavedPrompt = {
       ...existingPrompt,

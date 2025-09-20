@@ -1,0 +1,19 @@
+{
+  "title": "Settings",
+  "subtitle": "Configure the app to match your preferences.",
+  "languageLabel": "🌍 Languages",
+  "languageHelper": "Full localization coming soon.",
+  "themeLabel": "Theme",
+  "themeHelper": "The theme applies instantly across the app.",
+  "reviewLabel": "Review",
+  "reviewDescription": "Rate the app on the stores",
+  "contactLabel": "Contact",
+  "contactDescription": "Contact us for support or suggestions",
+  "legalLabel": "Legal",
+  "legalDescription": "Privacy policy and legal notice",
+  "alerts": {
+    "openError": "Unable to open the requested page.",
+    "openMailError": "Unable to open the mail client.",
+    "openStoreError": "Unable to open the rating page."
+  }
+}

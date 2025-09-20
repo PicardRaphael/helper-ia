@@ -1,0 +1,19 @@
+{
+  "title": "Paramètres",
+  "subtitle": "Configurez votre application selon vos préférences.",
+  "languageLabel": "🌍 Langues",
+  "languageHelper": "Localisation complète bientôt disponible.",
+  "themeLabel": "Thème",
+  "themeHelper": "Le thème s'applique instantanément dans l'application.",
+  "reviewLabel": "Évaluation",
+  "reviewDescription": "Noter l'application sur les stores",
+  "contactLabel": "Contact",
+  "contactDescription": "Nous contacter pour support ou suggestions",
+  "legalLabel": "Légales",
+  "legalDescription": "Politique de confidentialité et mentions légales",
+  "alerts": {
+    "openError": "Impossible d'ouvrir la page demandée.",
+    "openMailError": "Impossible d'ouvrir le client mail.",
+    "openStoreError": "Impossible d'ouvrir la page de notation."
+  }
+}
