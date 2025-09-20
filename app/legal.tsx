@@ -27,27 +27,27 @@ export default function LegalScreen() {
         color: colors.text,
         fontSize: 24,
         marginBottom: 12,
-        fontWeight: '600',
+        fontWeight: '600' as const,
       },
       heading2: {
         color: colors.text,
         fontSize: 20,
         marginTop: 12,
         marginBottom: 8,
-        fontWeight: '600',
+        fontWeight: '600' as const,
       },
       heading3: {
         color: colors.text,
         fontSize: 18,
         marginTop: 12,
         marginBottom: 8,
-        fontWeight: '600',
+        fontWeight: '600' as const,
       },
       paragraph: {
         marginBottom: 12,
       },
       strong: {
-        fontWeight: '700',
+        fontWeight: '700' as const,
         color: colors.text,
       },
       bullet_list: {
